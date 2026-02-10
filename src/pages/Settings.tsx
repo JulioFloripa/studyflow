@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useStudy } from '@/contexts/StudyContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings as SettingsIcon, Save, RotateCcw } from 'lucide-react';
+import { Settings as SettingsIcon, Save, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 
 const dayLabels: Record<string, string> = {
@@ -13,7 +14,8 @@ const dayLabels: Record<string, string> = {
 };
 
 const SettingsPage = () => {
-  const { userProfile, updateProfile, resetData } = useStudy();
+  const { userProfile, updateProfile } = useStudy();
+  const { signOut } = useAuth();
   const [form, setForm] = useState({ ...userProfile });
 
   const handleSave = () => {
@@ -21,13 +23,8 @@ const SettingsPage = () => {
     toast.success('Configurações salvas!');
   };
 
-  const handleReset = () => {
-    if (window.confirm('Tem certeza? Isso irá restaurar todos os dados de exemplo.')) {
-      resetData();
-      toast.success('Dados restaurados!');
-      setForm({ ...userProfile });
-      window.location.reload();
-    }
+  const handleLogout = async () => {
+    await signOut();
   };
 
   const updateAvailability = (day: string, hours: number) => {
@@ -118,8 +115,8 @@ const SettingsPage = () => {
           <Button onClick={handleSave} className="flex-1">
             <Save className="h-4 w-4 mr-2" /> Salvar Configurações
           </Button>
-          <Button variant="outline" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4 mr-2" /> Restaurar Dados
+          <Button variant="outline" onClick={handleLogout} className="text-destructive">
+            <LogOut className="h-4 w-4 mr-2" /> Sair
           </Button>
         </div>
       </div>

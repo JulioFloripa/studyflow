@@ -7,7 +7,22 @@ import { Clock, Target, Flame, TrendingUp, AlertTriangle, RotateCcw } from 'luci
 import { startOfWeek, addDays, format } from 'date-fns';
 
 const Dashboard = () => {
-  const { subjects, topics, studySessions, reviews, userProfile } = useStudy();
+  const { subjects, topics, studySessions, reviews, userProfile, loading } = useStudy();
+
+  if (loading) {
+    return (
+      <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-64" />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="h-32 bg-muted rounded" />
+            <div className="h-32 bg-muted rounded" />
+            <div className="h-32 bg-muted rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const today = new Date().toISOString().split('T')[0];
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });

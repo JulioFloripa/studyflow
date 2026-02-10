@@ -23,14 +23,14 @@ const RegisterStudy = () => {
 
   const filteredTopics = topics.filter(t => t.subjectId === subjectId);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subjectId || !topicId || !minutes) {
       toast.error('Preencha disciplina, assunto e tempo.');
       return;
     }
 
-    addStudySession({
+    await addStudySession({
       subjectId,
       topicId,
       date: new Date().toISOString().split('T')[0],
