@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 const Planning = () => {
   const { studyCycle, subjects, generateCycle, userProfile } = useStudy();
 
-  const handleGenerate = () => {
-    generateCycle();
+  const handleGenerate = async () => {
+    await generateCycle();
     toast.success('Ciclo de estudos gerado!');
   };
 
