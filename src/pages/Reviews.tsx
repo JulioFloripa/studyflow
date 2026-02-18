@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RotateCcw, Check, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ReviewCompletionDialog } from '@/components/ReviewCompletionDialog';
+import type { EaseFactor } from '@/lib/spacedRepetition';
 import type { Review } from '@/types/study';
 
 const Reviews = () => {
@@ -26,7 +27,7 @@ const Reviews = () => {
   };
 
   const handleComplete = async (data: {
-    easeFactor: number;
+    easeFactor: EaseFactor;
     minutes?: number;
     questionsTotal?: number;
     questionsCorrect?: number;

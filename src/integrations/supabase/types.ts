@@ -44,6 +44,7 @@ export type Database = {
           name: string
           objective: string
           review_intervals: Json
+          unlocked_badges: string[] | null
           updated_at: string
           weekly_goal_hours: number
         }
@@ -55,6 +56,7 @@ export type Database = {
           name?: string
           objective?: string
           review_intervals?: Json
+          unlocked_badges?: string[] | null
           updated_at?: string
           weekly_goal_hours?: number
         }
@@ -66,6 +68,7 @@ export type Database = {
           name?: string
           objective?: string
           review_intervals?: Json
+          unlocked_badges?: string[] | null
           updated_at?: string
           weekly_goal_hours?: number
         }
@@ -76,8 +79,10 @@ export type Database = {
           completed: boolean
           completed_date: string | null
           created_at: string
+          ease_factor: number | null
           id: string
           minutes_spent: number | null
+          next_interval: number | null
           original_session_id: string | null
           questions_correct: number | null
           questions_total: number | null
@@ -91,8 +96,10 @@ export type Database = {
           completed?: boolean
           completed_date?: string | null
           created_at?: string
+          ease_factor?: number | null
           id?: string
           minutes_spent?: number | null
+          next_interval?: number | null
           original_session_id?: string | null
           questions_correct?: number | null
           questions_total?: number | null
@@ -106,8 +113,10 @@ export type Database = {
           completed?: boolean
           completed_date?: string | null
           created_at?: string
+          ease_factor?: number | null
           id?: string
           minutes_spent?: number | null
+          next_interval?: number | null
           original_session_id?: string | null
           questions_correct?: number | null
           questions_total?: number | null
