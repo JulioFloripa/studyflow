@@ -3,6 +3,7 @@ import { Subject, Topic, StudySession, Review, StudyCycleItem, UserProfile, Topi
 import { presetExams } from '@/data/presetExams';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { calculateNextReview, getReviewType, type EaseFactor } from '@/lib/spacedRepetition';
 
 interface StudyContextType {
   subjects: Subject[];
@@ -20,7 +21,7 @@ interface StudyContextType {
   updateTopicStatus: (topicId: string, status: TopicStatus) => Promise<void>;
   removeTopic: (id: string) => Promise<void>;
   addStudySession: (session: Omit<StudySession, 'id'>) => Promise<void>;
-  markReviewDone: (reviewId: string, data?: { minutes?: number; questionsTotal?: number; questionsCorrect?: number }) => Promise<void>;
+  markReviewDone: (reviewId: string, data?: { minutes?: number; questionsTotal?: number; questionsCorrect?: number; easeFactor?: EaseFactor }) => Promise<void>;
   importPreset: (presetId: string) => Promise<void>;
   generateCycle: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
@@ -182,18 +183,49 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [user, userProfile.reviewIntervals, topics, updateTopicStatus]);
 
-  const markReviewDone = useCallback(async (reviewId: string, data?: { minutes?: number; questionsTotal?: number; questionsCorrect?: number }) => {
+  const markReviewDone = useCallback(async (reviewId: string, data?: { minutes?: number; questionsTotal?: number; questionsCorrect?: number; easeFactor?: EaseFactor }) => {
     if (!user) return;
+    const review = reviews.find(r => r.id === reviewId);
+    if (!review) return;
+
     const updates: any = { completed: true, completed_date: new Date().toISOString().split('T')[0] };
     if (data?.minutes !== undefined) updates.minutes_spent = data.minutes;
     if (data?.questionsTotal !== undefined) updates.questions_total = data.questionsTotal;
     if (data?.questionsCorrect !== undefined) updates.questions_correct = data.questionsCorrect;
+    if (data?.easeFactor !== undefined) updates.ease_factor = data.easeFactor;
+
+    // Calcular próxima revisão se easeFactor foi fornecido
+    if (data?.easeFactor) {
+      const currentInterval = review.type === 'D1' ? 1 : review.type === 'D7' ? 7 : 30;
+      const { nextInterval } = calculateNextReview(currentInterval, data.easeFactor, review.easeFactor);
+      updates.next_interval = nextInterval;
+
+      // Agendar próxima revisão automaticamente
+      const nextDate = new Date(review.scheduledDate);
+      nextDate.setDate(nextDate.getDate() + nextInterval);
+      const nextType = getReviewType(nextInterval);
+
+      await supabase.from('reviews').insert({
+        user_id: user.id,
+        topic_id: review.topicId,
+        subject_id: review.subjectId,
+        original_session_id: review.originalSessionId,
+        scheduled_date: nextDate.toISOString().split('T')[0],
+        type: nextType,
+      } as any);
+    }
+
     const { error } = await supabase.from('reviews').update(updates).eq('id', reviewId).eq('user_id', user.id);
-    if (!error) setReviews(prev => prev.map(r => r.id === reviewId ? {
-      ...r, completed: true, completedDate: updates.completed_date,
-      minutesSpent: data?.minutes, questionsTotal: data?.questionsTotal, questionsCorrect: data?.questionsCorrect,
-    } : r));
-  }, [user]);
+    if (!error) {
+      setReviews(prev => prev.map(r => r.id === reviewId ? {
+        ...r, completed: true, completedDate: updates.completed_date,
+        minutesSpent: data?.minutes, questionsTotal: data?.questionsTotal, 
+        questionsCorrect: data?.questionsCorrect, easeFactor: data?.easeFactor,
+        nextInterval: updates.next_interval,
+      } : r));
+      await refreshData(); // Refresh para pegar a nova revisão agendada
+    }
+  }, [user, reviews, refreshData]);
 
   const importPreset = useCallback(async (presetId: string) => {
     if (!user) return;

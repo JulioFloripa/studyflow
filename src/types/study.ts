@@ -40,6 +40,8 @@ export interface Review {
   questionsTotal?: number;
   questionsCorrect?: number;
   type: 'D1' | 'D7' | 'D30';
+  easeFactor?: number; // 1-5: quão fácil foi a revisão
+  nextInterval?: number; // dias até próxima revisão (calculado)
 }
 
 export interface StudyCycleItem {
@@ -56,6 +58,7 @@ export interface UserProfile {
   examDate: string;
   availability: Record<string, number>;
   reviewIntervals: number[];
+  unlockedBadges?: string[]; // IDs dos badges desbloqueados
 }
 
 export interface PresetExam {

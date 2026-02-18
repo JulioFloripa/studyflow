@@ -14,6 +14,7 @@ import Reviews from "@/pages/Reviews";
 import VerticalSyllabus from "@/pages/VerticalSyllabus";
 import Difficulties from "@/pages/Difficulties";
 import SettingsPage from "@/pages/Settings";
+import Gamification from "@/pages/Gamification";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -45,6 +46,7 @@ const App = () => (
                 <Route path="/revisoes" element={<Reviews />} />
                 <Route path="/edital" element={<VerticalSyllabus />} />
                 <Route path="/dificuldades" element={<Difficulties />} />
+                <Route path="/conquistas" element={<Gamification />} />
                 <Route path="/configuracoes" element={<SettingsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />

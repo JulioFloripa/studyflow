@@ -6,19 +6,35 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RotateCcw, Check, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { ReviewCompletionDialog } from '@/components/ReviewCompletionDialog';
+import type { Review } from '@/types/study';
 
 const Reviews = () => {
   const { reviews, topics, subjects, markReviewDone } = useStudy();
   const today = new Date().toISOString().split('T')[0];
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
 
   const todayReviews = reviews.filter(r => !r.completed && r.scheduledDate === today);
   const overdueReviews = reviews.filter(r => !r.completed && r.scheduledDate < today);
   const upcomingReviews = reviews.filter(r => !r.completed && r.scheduledDate > today);
   const completedReviews = reviews.filter(r => r.completed).sort((a, b) => (b.completedDate || '').localeCompare(a.completedDate || ''));
 
-  const handleDone = (id: string) => {
-    markReviewDone(id);
+  const handleDone = (review: Review) => {
+    setSelectedReview(review);
+    setDialogOpen(true);
+  };
+
+  const handleComplete = async (data: {
+    easeFactor: number;
+    minutes?: number;
+    questionsTotal?: number;
+    questionsCorrect?: number;
+  }) => {
+    if (!selectedReview) return;
+    await markReviewDone(selectedReview.id, data);
     toast.success('Revisão concluída!');
+    setSelectedReview(null);
   };
 
   const ReviewCard = ({ review, showDate = false }: { review: typeof reviews[0]; showDate?: boolean }) => {
@@ -39,7 +55,7 @@ const Reviews = () => {
         </div>
         {isOverdue && <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />}
         {!review.completed && (
-          <Button size="sm" variant="outline" onClick={() => handleDone(review.id)} className="flex-shrink-0">
+          <Button size="sm" variant="outline" onClick={() => handleDone(review)} className="flex-shrink-0">
             <Check className="h-4 w-4" />
           </Button>
         )}
@@ -100,6 +116,13 @@ const Reviews = () => {
           {completedReviews.length === 0 ? <EmptyState message="Nenhuma revisão concluída ainda." /> : completedReviews.slice(0, 20).map(r => <ReviewCard key={r.id} review={r} showDate />)}
         </TabsContent>
       </Tabs>
+
+      <ReviewCompletionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onComplete={handleComplete}
+        topicName={selectedReview ? (topics.find(t => t.id === selectedReview.topicId)?.name || 'Assunto') : ''}
+      />
     </div>
   );
 };

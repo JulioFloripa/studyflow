@@ -5,9 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Clock, Target, Flame, TrendingUp, AlertTriangle, RotateCcw } from 'lucide-react';
 import { startOfWeek, addDays, format } from 'date-fns';
+import { NextActionCard } from '@/components/NextActionCard';
+import { GamificationCard } from '@/components/GamificationCard';
+import { getTopSuggestion } from '@/lib/suggestions';
+import { getUserStats, checkUnlockedBadges } from '@/lib/gamification';
 
 const Dashboard = () => {
-  const { subjects, topics, studySessions, reviews, userProfile, loading } = useStudy();
+  const { subjects, topics, studySessions, reviews, userProfile, loading, studyCycle } = useStudy();
 
   if (loading) {
     return (
@@ -82,6 +86,19 @@ const Dashboard = () => {
     return 'Boa noite';
   };
 
+  // Sugestão inteligente
+  const topSuggestion = getTopSuggestion({
+    subjects,
+    topics,
+    studySessions,
+    reviews,
+    studyCycle,
+  });
+
+  // Gamificação
+  const userStats = getUserStats(studySessions, reviews);
+  const { badges } = checkUnlockedBadges(studySessions, reviews, userProfile.unlockedBadges || []);
+
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-6">
@@ -89,6 +106,16 @@ const Dashboard = () => {
           {getGreeting()}, {userProfile.name}! 👋
         </h1>
         <p className="text-muted-foreground mt-1">Acompanhe seu progresso de estudos</p>
+      </div>
+
+      {/* Next Action + Gamification */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div className="lg:col-span-2">
+          <NextActionCard suggestion={topSuggestion} loading={loading} />
+        </div>
+        <div>
+          <GamificationCard stats={userStats} badges={badges} compact />
+        </div>
       </div>
 
       {/* Metric Cards */}

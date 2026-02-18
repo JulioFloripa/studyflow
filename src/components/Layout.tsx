@@ -1,5 +1,5 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Settings, Menu, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Settings, Menu, GraduationCap } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -12,6 +12,7 @@ const navItems = [
   { path: '/revisoes', label: 'Revisões', icon: RotateCcw },
   { path: '/edital', label: 'Edital', icon: ListChecks },
   { path: '/dificuldades', label: 'Dificuldades', icon: AlertTriangle },
+  { path: '/conquistas', label: 'Conquistas', icon: Trophy },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
