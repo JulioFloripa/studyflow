@@ -66,7 +66,7 @@ export type Database = {
             foreignKeyName: "class_time_templates_subject_id_fkey"
             columns: ["subject_id"]
             isOneToOne: false
-            referencedRelation: "subjects"
+            referencedRelation: "schedule_subjects"
             referencedColumns: ["id"]
           },
         ]
@@ -239,6 +239,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      schedule_subjects: {
+        Row: {
+          color: string | null
+          coordinator_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          coordinator_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          coordinator_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       students: {
         Row: {
@@ -491,7 +515,7 @@ export type Database = {
             foreignKeyName: "time_grid_subject_id_fkey"
             columns: ["subject_id"]
             isOneToOne: false
-            referencedRelation: "subjects"
+            referencedRelation: "schedule_subjects"
             referencedColumns: ["id"]
           },
         ]

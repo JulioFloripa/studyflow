@@ -13,7 +13,7 @@ import { downloadReportPDF } from '@/lib/pdfGenerator';
 import type { StudyCycleResult } from '@/lib/cycleGeneratorV2';
 
 const StudentCycle = () => {
-  const { students, selectedStudent, selectStudent, timeSlots } = useEducational();
+  const { students, selectedStudent, selectStudent, timeSlots, scheduleSubjects } = useEducational();
   const { subjects, topics } = useStudy();
   const [cycle, setCycle] = useState<StudyCycleResult | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -55,7 +55,8 @@ const StudentCycle = () => {
         selectedStudent,
         timeSlots,
         subjects,
-        topicsBySubject
+        topicsBySubject,
+        scheduleSubjects
       );
 
       setCycle(generatedCycle);

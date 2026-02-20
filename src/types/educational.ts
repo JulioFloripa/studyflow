@@ -1,5 +1,13 @@
 // Tipos para o Sistema Educacional Completo
 
+export interface ScheduleSubject {
+  id: string;
+  coordinatorId: string;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
 export interface Class {
   id: string;
   coordinatorId: string;

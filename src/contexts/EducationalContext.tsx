@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Class, Student, TimeSlot, TimeSlotStatus, ClassTimeTemplate } from '@/types/educational';
+import { Class, Student, TimeSlot, TimeSlotStatus, ClassTimeTemplate, ScheduleSubject } from '@/types/educational';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -9,6 +9,7 @@ interface EducationalContextType {
   students: Student[];
   timeSlots: TimeSlot[];
   classTemplates: ClassTimeTemplate[];
+  scheduleSubjects: ScheduleSubject[];
   selectedStudent: Student | null;
   loading: boolean;
   
@@ -23,6 +24,10 @@ interface EducationalContextType {
   updateClassTemplate: (id: string, updates: Partial<ClassTimeTemplate>) => Promise<void>;
   removeClassTemplate: (id: string) => Promise<void>;
   bulkAddClassTemplates: (templates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
+  
+  // Schedule Subjects
+  addScheduleSubject: (name: string, color?: string) => Promise<ScheduleSubject | null>;
+  removeScheduleSubject: (id: string) => Promise<void>;
   
   // Students
   addStudent: (studentData: Omit<Student, 'id' | 'coordinatorId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -55,6 +60,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [students, setStudents] = useState<Student[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [classTemplates, setClassTemplates] = useState<ClassTimeTemplate[]>([]);
+  const [scheduleSubjects, setScheduleSubjects] = useState<ScheduleSubject[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -117,6 +123,25 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
             notes: s.notes,
             createdAt: s.created_at,
             updatedAt: s.updated_at,
+          }))
+        );
+      }
+
+      // Carregar disciplinas do horário
+      const { data: schedSubData } = await (supabase as any)
+        .from('schedule_subjects')
+        .select('*')
+        .eq('coordinator_id', user.id)
+        .order('name');
+
+      if (schedSubData) {
+        setScheduleSubjects(
+          schedSubData.map((s: any) => ({
+            id: s.id,
+            coordinatorId: s.coordinator_id,
+            name: s.name,
+            color: s.color,
+            createdAt: s.created_at,
           }))
         );
       }
@@ -185,6 +210,44 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const { error } = await (supabase as any).from('classes').delete().eq('id', id);
     if (!error) {
       setClasses(prev => prev.filter(c => c.id !== id));
+    }
+  }, []);
+
+  // Schedule Subjects
+  const addScheduleSubject = useCallback(
+    async (name: string, color?: string): Promise<ScheduleSubject | null> => {
+      if (!user) return null;
+
+      const { data, error } = await (supabase as any)
+        .from('schedule_subjects')
+        .insert({
+          coordinator_id: user.id,
+          name,
+          color: color || '#4338CA',
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        const newSubject: ScheduleSubject = {
+          id: data.id,
+          coordinatorId: data.coordinator_id,
+          name: data.name,
+          color: data.color,
+          createdAt: data.created_at,
+        };
+        setScheduleSubjects(prev => [...prev, newSubject]);
+        return newSubject;
+      }
+      return null;
+    },
+    [user]
+  );
+
+  const removeScheduleSubject = useCallback(async (id: string) => {
+    const { error } = await (supabase as any).from('schedule_subjects').delete().eq('id', id);
+    if (!error) {
+      setScheduleSubjects(prev => prev.filter(s => s.id !== id));
     }
   }, []);
 
@@ -338,7 +401,6 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const bulkUpdateTimeSlots = useCallback(async (updates: Partial<TimeSlot>[]) => {
-    // Atualizar em lote
     for (const update of updates) {
       if (update.id) {
         await (supabase as any)
@@ -352,7 +414,6 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     }
 
-    // Atualizar estado local
     setTimeSlots(prev =>
       prev.map(slot => {
         const update = updates.find(u => u.id === slot.id);
@@ -362,7 +423,6 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const initializeTimeGrid = useCallback(async (studentId: string) => {
-    // Chamar função SQL para inicializar grade
     await (supabase as any).rpc('initialize_time_grid', { p_student_id: studentId });
   }, []);
 
@@ -497,13 +557,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 
   const copyClassTemplatesToStudent = useCallback(async (studentId: string, classId: string) => {
-    // Chamar função SQL para copiar templates
     await (supabase as any).rpc('copy_class_templates_to_student', {
       p_student_id: studentId,
       p_class_id: classId,
     });
     
-    // Recarregar grade do aluno
     await loadTimeGrid(studentId);
   }, [loadTimeGrid]);
 
@@ -514,6 +572,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         students,
         timeSlots,
         classTemplates,
+        scheduleSubjects,
         selectedStudent,
         loading,
         addClass,
@@ -524,6 +583,8 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateClassTemplate,
         removeClassTemplate,
         bulkAddClassTemplates,
+        addScheduleSubject,
+        removeScheduleSubject,
         addStudent,
         updateStudent,
         removeStudent,
