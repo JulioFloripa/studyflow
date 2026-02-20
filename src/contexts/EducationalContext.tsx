@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Class, Student, TimeSlot, TimeSlotStatus, ClassTimeTemplate, ScheduleSubject } from '@/types/educational';
+import { Class, Student, TimeSlot, TimeSlotStatus, ClassTimeTemplate, ScheduleSubject, SyllabusItem, SyllabusItemStatus } from '@/types/educational';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -10,6 +10,7 @@ interface EducationalContextType {
   timeSlots: TimeSlot[];
   classTemplates: ClassTimeTemplate[];
   scheduleSubjects: ScheduleSubject[];
+  syllabusItems: SyllabusItem[];
   selectedStudent: Student | null;
   loading: boolean;
   
@@ -28,6 +29,14 @@ interface EducationalContextType {
   // Schedule Subjects
   addScheduleSubject: (name: string, color?: string) => Promise<ScheduleSubject | null>;
   removeScheduleSubject: (id: string) => Promise<void>;
+  
+  // Syllabus
+  loadSyllabusItems: (scheduleSubjectId: string) => Promise<void>;
+  addSyllabusItem: (item: Omit<SyllabusItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateSyllabusItem: (id: string, updates: Partial<SyllabusItem>) => Promise<void>;
+  removeSyllabusItem: (id: string) => Promise<void>;
+  reorderSyllabusItems: (items: { id: string; sortOrder: number }[]) => Promise<void>;
+  advanceSyllabus: (scheduleSubjectId: string) => Promise<void>;
   
   // Students
   addStudent: (studentData: Omit<Student, 'id' | 'coordinatorId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -61,6 +70,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [classTemplates, setClassTemplates] = useState<ClassTimeTemplate[]>([]);
   const [scheduleSubjects, setScheduleSubjects] = useState<ScheduleSubject[]>([]);
+  const [syllabusItems, setSyllabusItems] = useState<SyllabusItem[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -250,6 +260,126 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setScheduleSubjects(prev => prev.filter(s => s.id !== id));
     }
   }, []);
+
+  // Syllabus Items
+  const loadSyllabusItems = useCallback(async (scheduleSubjectId: string) => {
+    const { data } = await (supabase as any)
+      .from('syllabus_items')
+      .select('*')
+      .eq('schedule_subject_id', scheduleSubjectId)
+      .order('sort_order');
+
+    if (data) {
+      setSyllabusItems(
+        data.map((item: any) => ({
+          id: item.id,
+          scheduleSubjectId: item.schedule_subject_id,
+          name: item.name,
+          description: item.description,
+          sortOrder: item.sort_order,
+          status: item.status as SyllabusItemStatus,
+          plannedWeek: item.planned_week,
+          completedAt: item.completed_at,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        }))
+      );
+    }
+  }, []);
+
+  const addSyllabusItem = useCallback(
+    async (item: Omit<SyllabusItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const { data, error } = await (supabase as any)
+        .from('syllabus_items')
+        .insert({
+          schedule_subject_id: item.scheduleSubjectId,
+          name: item.name,
+          description: item.description || null,
+          sort_order: item.sortOrder,
+          status: item.status || 'pending',
+          planned_week: item.plannedWeek || null,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        setSyllabusItems(prev => [...prev, {
+          id: data.id,
+          scheduleSubjectId: data.schedule_subject_id,
+          name: data.name,
+          description: data.description,
+          sortOrder: data.sort_order,
+          status: data.status as SyllabusItemStatus,
+          plannedWeek: data.planned_week,
+          completedAt: data.completed_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        }]);
+      }
+    },
+    []
+  );
+
+  const updateSyllabusItem = useCallback(async (id: string, updates: Partial<SyllabusItem>) => {
+    const dbUpdates: any = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.plannedWeek !== undefined) dbUpdates.planned_week = updates.plannedWeek;
+    if (updates.completedAt !== undefined) dbUpdates.completed_at = updates.completedAt;
+
+    const { error } = await (supabase as any)
+      .from('syllabus_items')
+      .update(dbUpdates)
+      .eq('id', id);
+
+    if (!error) {
+      setSyllabusItems(prev => prev.map(item => (item.id === id ? { ...item, ...updates } : item)));
+    }
+  }, []);
+
+  const removeSyllabusItem = useCallback(async (id: string) => {
+    const { error } = await (supabase as any).from('syllabus_items').delete().eq('id', id);
+    if (!error) {
+      setSyllabusItems(prev => prev.filter(item => item.id !== id));
+    }
+  }, []);
+
+  const reorderSyllabusItems = useCallback(async (items: { id: string; sortOrder: number }[]) => {
+    for (const item of items) {
+      await (supabase as any)
+        .from('syllabus_items')
+        .update({ sort_order: item.sortOrder })
+        .eq('id', item.id);
+    }
+    setSyllabusItems(prev =>
+      prev.map(si => {
+        const updated = items.find(i => i.id === si.id);
+        return updated ? { ...si, sortOrder: updated.sortOrder } : si;
+      }).sort((a, b) => a.sortOrder - b.sortOrder)
+    );
+  }, []);
+
+  const advanceSyllabus = useCallback(async (scheduleSubjectId: string) => {
+    const subjectItems = syllabusItems
+      .filter(i => i.scheduleSubjectId === scheduleSubjectId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const currentItem = subjectItems.find(i => i.status === 'current');
+    const nextPending = subjectItems.find(i => i.status === 'pending');
+
+    if (currentItem) {
+      await updateSyllabusItem(currentItem.id, {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    if (nextPending) {
+      await updateSyllabusItem(nextPending.id, { status: 'current' });
+    }
+  }, [syllabusItems, updateSyllabusItem]);
 
   // Students
   const addStudent = useCallback(
@@ -573,6 +703,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         timeSlots,
         classTemplates,
         scheduleSubjects,
+        syllabusItems,
         selectedStudent,
         loading,
         addClass,
@@ -585,6 +716,12 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         bulkAddClassTemplates,
         addScheduleSubject,
         removeScheduleSubject,
+        loadSyllabusItems,
+        addSyllabusItem,
+        updateSyllabusItem,
+        removeSyllabusItem,
+        reorderSyllabusItems,
+        advanceSyllabus,
         addStudent,
         updateStudent,
         removeStudent,

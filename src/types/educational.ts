@@ -8,6 +8,21 @@ export interface ScheduleSubject {
   createdAt: string;
 }
 
+export type SyllabusItemStatus = 'pending' | 'current' | 'completed';
+
+export interface SyllabusItem {
+  id: string;
+  scheduleSubjectId: string;
+  name: string;
+  description?: string;
+  sortOrder: number;
+  status: SyllabusItemStatus;
+  plannedWeek?: number;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Class {
   id: string;
   coordinatorId: string;

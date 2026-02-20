@@ -9,10 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Edit2, Trash2, GraduationCap, Clock } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, GraduationCap, Clock, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Class } from '@/types/educational';
 import { ClassTimeEditor } from '@/components/ClassTimeEditor';
+import { SyllabusEditor } from '@/components/SyllabusEditor';
 
 const Classes = () => {
   const {
@@ -258,6 +259,26 @@ const Classes = () => {
                     onBulkAdd={bulkAddClassTemplates}
                     onAddScheduleSubject={addScheduleSubject}
                   />
+                </DialogContent>
+              </Dialog>
+
+              {/* Ementa / Syllabus */}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Ementa / Conteúdos
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Ementa - {classItem.name}</DialogTitle>
+                  </DialogHeader>
+                  <SyllabusEditor scheduleSubjects={scheduleSubjects} />
                 </DialogContent>
               </Dialog>
             </Card>

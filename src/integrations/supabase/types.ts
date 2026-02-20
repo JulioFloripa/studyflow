@@ -460,6 +460,53 @@ export type Database = {
         }
         Relationships: []
       }
+      syllabus_items: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          planned_week: number | null
+          schedule_subject_id: string
+          sort_order: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          planned_week?: number | null
+          schedule_subject_id: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          planned_week?: number | null
+          schedule_subject_id?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "syllabus_items_schedule_subject_id_fkey"
+            columns: ["schedule_subject_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_grid: {
         Row: {
           color: string | null
