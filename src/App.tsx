@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { StudyProvider } from "@/contexts/StudyContext";
+import { EducationalProvider } from "@/contexts/EducationalContext";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import StudyPlan from "@/pages/StudyPlan";
@@ -15,6 +16,8 @@ import VerticalSyllabus from "@/pages/VerticalSyllabus";
 import Difficulties from "@/pages/Difficulties";
 import SettingsPage from "@/pages/Settings";
 import Gamification from "@/pages/Gamification";
+import Classes from "@/pages/Classes";
+import Students from "@/pages/Students";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -33,6 +36,7 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <StudyProvider>
+          <EducationalProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -48,10 +52,13 @@ const App = () => (
                 <Route path="/dificuldades" element={<Difficulties />} />
                 <Route path="/conquistas" element={<Gamification />} />
                 <Route path="/configuracoes" element={<SettingsPage />} />
+                <Route path="/turmas" element={<Classes />} />
+                <Route path="/alunos" element={<Students />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+          </EducationalProvider>
         </StudyProvider>
       </AuthProvider>
     </TooltipProvider>
