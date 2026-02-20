@@ -312,6 +312,9 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
           status: t.status,
           customLabel: t.custom_label,
           color: t.color,
+          subjectId: t.subject_id,
+          scheduleType: t.schedule_type,
+          inheritedFromClass: t.inherited_from_class,
           createdAt: t.created_at,
           updatedAt: t.updated_at,
         }))
@@ -382,6 +385,8 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
           label: t.label,
           color: t.color,
           status: t.status,
+          subjectId: t.subject_id,
+          scheduleType: t.schedule_type,
           createdAt: t.created_at,
           updatedAt: t.updated_at,
         }))
@@ -400,6 +405,8 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
           label: template.label,
           color: template.color,
           status: template.status,
+          subject_id: template.subjectId || null,
+          schedule_type: template.scheduleType || 'class',
         })
         .select()
         .single();
@@ -415,6 +422,8 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
             label: data.label,
             color: data.color,
             status: data.status as TimeSlotStatus,
+            subjectId: data.subject_id,
+            scheduleType: data.schedule_type,
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           },
@@ -459,6 +468,8 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
             label: t.label,
             color: t.color,
             status: t.status,
+            subject_id: t.subjectId || null,
+            schedule_type: t.scheduleType || 'class',
           }))
         )
         .select();
@@ -474,6 +485,8 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
             label: t.label,
             color: t.color,
             status: t.status,
+            subjectId: t.subject_id,
+            scheduleType: t.schedule_type,
             createdAt: t.created_at,
             updatedAt: t.updated_at,
           })),

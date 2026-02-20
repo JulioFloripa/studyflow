@@ -22,8 +22,10 @@ export type Database = {
           day_of_week: number
           id: string
           label: string
+          schedule_type: string
           start_time: string
           status: string
+          subject_id: string | null
           updated_at: string
         }
         Insert: {
@@ -33,8 +35,10 @@ export type Database = {
           day_of_week: number
           id?: string
           label?: string
+          schedule_type?: string
           start_time: string
           status?: string
+          subject_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -44,8 +48,10 @@ export type Database = {
           day_of_week?: number
           id?: string
           label?: string
+          schedule_type?: string
           start_time?: string
           status?: string
+          subject_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -54,6 +60,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_time_templates_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
         ]
@@ -431,9 +444,11 @@ export type Database = {
           day_of_week: number
           id: string
           inherited_from_class: boolean | null
+          schedule_type: string
           start_time: string
           status: string
           student_id: string
+          subject_id: string | null
           updated_at: string
         }
         Insert: {
@@ -443,9 +458,11 @@ export type Database = {
           day_of_week: number
           id?: string
           inherited_from_class?: boolean | null
+          schedule_type?: string
           start_time: string
           status?: string
           student_id: string
+          subject_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -455,9 +472,11 @@ export type Database = {
           day_of_week?: number
           id?: string
           inherited_from_class?: boolean | null
+          schedule_type?: string
           start_time?: string
           status?: string
           student_id?: string
+          subject_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -466,6 +485,13 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_grid_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
         ]
@@ -516,6 +542,16 @@ export type Database = {
       copy_class_templates_to_student: {
         Args: { p_class_id: string; p_student_id: string }
         Returns: undefined
+      }
+      get_class_schedule_by_subject: {
+        Args: { p_student_id: string }
+        Returns: {
+          day_of_week: number
+          schedule_type: string
+          start_time: string
+          subject_id: string
+          subject_name: string
+        }[]
       }
       initialize_time_grid: {
         Args: { p_student_id: string }
