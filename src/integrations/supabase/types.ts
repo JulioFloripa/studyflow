@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      class_time_templates: {
+        Row: {
+          class_id: string
+          color: string | null
+          created_at: string
+          day_of_week: number
+          id: string
+          label: string
+          start_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          color?: string | null
+          created_at?: string
+          day_of_week: number
+          id?: string
+          label?: string
+          start_time: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          color?: string | null
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          label?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_time_templates_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classes: {
+        Row: {
+          coordinator_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          semester: number | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          coordinator_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          semester?: number | null
+          updated_at?: string
+          year?: number
+        }
+        Update: {
+          coordinator_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          semester?: number | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       imported_presets: {
         Row: {
           id: string
@@ -150,6 +227,80 @@ export type Database = {
           },
         ]
       }
+      students: {
+        Row: {
+          academic_history: Json | null
+          birth_date: string | null
+          class_id: string | null
+          coordinator_id: string
+          created_at: string
+          current_grade: string | null
+          email: string | null
+          full_name: string
+          id: string
+          learning_pace: string | null
+          learning_style: Json | null
+          notes: string | null
+          phone: string | null
+          special_needs: string | null
+          study_methods: string[] | null
+          target_career: string | null
+          target_university: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          academic_history?: Json | null
+          birth_date?: string | null
+          class_id?: string | null
+          coordinator_id: string
+          created_at?: string
+          current_grade?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          learning_pace?: string | null
+          learning_style?: Json | null
+          notes?: string | null
+          phone?: string | null
+          special_needs?: string | null
+          study_methods?: string[] | null
+          target_career?: string | null
+          target_university?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          academic_history?: Json | null
+          birth_date?: string | null
+          class_id?: string | null
+          coordinator_id?: string
+          created_at?: string
+          current_grade?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          learning_pace?: string | null
+          learning_style?: Json | null
+          notes?: string | null
+          phone?: string | null
+          special_needs?: string | null
+          study_methods?: string[] | null
+          target_career?: string | null
+          target_university?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_cycle: {
         Row: {
           created_at: string
@@ -272,6 +423,53 @@ export type Database = {
         }
         Relationships: []
       }
+      time_grid: {
+        Row: {
+          color: string | null
+          created_at: string
+          custom_label: string | null
+          day_of_week: number
+          id: string
+          inherited_from_class: boolean | null
+          start_time: string
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          custom_label?: string | null
+          day_of_week: number
+          id?: string
+          inherited_from_class?: boolean | null
+          start_time: string
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          custom_label?: string | null
+          day_of_week?: number
+          id?: string
+          inherited_from_class?: boolean | null
+          start_time?: string
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_grid_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       topics: {
         Row: {
           created_at: string
@@ -315,7 +513,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      copy_class_templates_to_student: {
+        Args: { p_class_id: string; p_student_id: string }
+        Returns: undefined
+      }
+      initialize_time_grid: {
+        Args: { p_student_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

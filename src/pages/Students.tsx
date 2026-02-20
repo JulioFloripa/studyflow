@@ -131,7 +131,7 @@ const Students = () => {
       ...prev,
       studyMethods: prev.studyMethods?.includes(method as any)
         ? prev.studyMethods.filter(m => m !== method)
-        : [...(prev.studyMethods || []), method],
+        : [...(prev.studyMethods || []), method as any],
     }));
   };
 

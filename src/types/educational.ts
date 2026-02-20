@@ -82,6 +82,7 @@ export interface TimeSlot {
   startTime: string; // "HH:MM" formato 24h
   status: TimeSlotStatus;
   label?: string;
+  customLabel?: string;
   color?: string;
   inheritedFromClass?: boolean; // Indica se foi herdado da turma
   createdAt: string;

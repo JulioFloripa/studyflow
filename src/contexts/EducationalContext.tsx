@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Class, Student, TimeSlot, ClassTimeTemplate } from '@/types/educational';
+import { Class, Student, TimeSlot, TimeSlotStatus, ClassTimeTemplate } from '@/types/educational';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -67,7 +67,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setLoading(true);
     try {
       // Carregar turmas
-      const { data: classesData } = await supabase
+      const { data: classesData } = await (supabase as any)
         .from('classes')
         .select('*')
         .eq('coordinator_id', user.id)
@@ -89,7 +89,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
       // Carregar alunos
-      const { data: studentsData } = await supabase
+      const { data: studentsData } = await (supabase as any)
         .from('students')
         .select('*')
         .eq('coordinator_id', user.id)
@@ -134,7 +134,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     async (classData: Omit<Class, 'id' | 'coordinatorId' | 'createdAt' | 'updatedAt'>) => {
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('classes')
         .insert({
           coordinator_id: user.id,
@@ -166,7 +166,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 
   const updateClass = useCallback(async (id: string, updates: Partial<Class>) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('classes')
       .update({
         name: updates.name,
@@ -182,7 +182,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const removeClass = useCallback(async (id: string) => {
-    const { error } = await supabase.from('classes').delete().eq('id', id);
+    const { error } = await (supabase as any).from('classes').delete().eq('id', id);
     if (!error) {
       setClasses(prev => prev.filter(c => c.id !== id));
     }
@@ -193,7 +193,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     async (studentData: Omit<Student, 'id' | 'coordinatorId' | 'createdAt' | 'updatedAt'>) => {
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('students')
         .insert({
           coordinator_id: user.id,
@@ -206,11 +206,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
           target_career: studentData.targetCareer,
           target_university: studentData.targetUniversity,
           current_grade: studentData.currentGrade,
-          learning_style: studentData.learningStyle,
+          learning_style: studentData.learningStyle as any,
           study_methods: studentData.studyMethods,
           learning_pace: studentData.learningPace,
           special_needs: studentData.specialNeeds,
-          academic_history: studentData.academicHistory,
+          academic_history: studentData.academicHistory as any,
           notes: studentData.notes,
         })
         .select()
@@ -229,11 +229,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
           targetCareer: data.target_career,
           targetUniversity: data.target_university,
           currentGrade: data.current_grade,
-          learningStyle: data.learning_style,
-          studyMethods: data.study_methods,
-          learningPace: data.learning_pace,
+          learningStyle: data.learning_style as any,
+          studyMethods: data.study_methods as any,
+          learningPace: data.learning_pace as any,
           specialNeeds: data.special_needs,
-          academicHistory: data.academic_history,
+          academicHistory: data.academic_history as any,
           notes: data.notes,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
@@ -248,7 +248,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 
   const updateStudent = useCallback(async (id: string, updates: Partial<Student>) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('students')
       .update({
         class_id: updates.classId,
@@ -259,11 +259,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         target_career: updates.targetCareer,
         target_university: updates.targetUniversity,
         current_grade: updates.currentGrade,
-        learning_style: updates.learningStyle,
+        learning_style: updates.learningStyle as any,
         study_methods: updates.studyMethods,
         learning_pace: updates.learningPace,
         special_needs: updates.specialNeeds,
-        academic_history: updates.academicHistory,
+        academic_history: updates.academicHistory as any,
         notes: updates.notes,
       })
       .eq('id', id);
@@ -274,7 +274,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const removeStudent = useCallback(async (id: string) => {
-    const { error } = await supabase.from('students').delete().eq('id', id);
+    const { error } = await (supabase as any).from('students').delete().eq('id', id);
     if (!error) {
       setStudents(prev => prev.filter(s => s.id !== id));
       if (selectedStudent?.id === id) {
@@ -295,7 +295,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Time Grid
   const loadTimeGrid = useCallback(async (studentId: string) => {
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('time_grid')
       .select('*')
       .eq('student_id', studentId)
@@ -320,7 +320,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const updateTimeSlot = useCallback(async (slotId: string, updates: Partial<TimeSlot>) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('time_grid')
       .update({
         status: updates.status,
@@ -338,7 +338,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // Atualizar em lote
     for (const update of updates) {
       if (update.id) {
-        await supabase
+        await (supabase as any)
           .from('time_grid')
           .update({
             status: update.status,
@@ -360,12 +360,12 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const initializeTimeGrid = useCallback(async (studentId: string) => {
     // Chamar função SQL para inicializar grade
-    await supabase.rpc('initialize_time_grid', { p_student_id: studentId });
+    await (supabase as any).rpc('initialize_time_grid', { p_student_id: studentId });
   }, []);
 
   // Class Time Templates
   const loadClassTemplates = useCallback(async (classId: string) => {
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('class_time_templates')
       .select('*')
       .eq('class_id', classId)
@@ -391,7 +391,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const addClassTemplate = useCallback(
     async (template: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('class_time_templates')
         .insert({
           class_id: template.classId,
@@ -414,7 +414,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
             startTime: data.start_time,
             label: data.label,
             color: data.color,
-            status: data.status,
+            status: data.status as TimeSlotStatus,
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           },
@@ -425,7 +425,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 
   const updateClassTemplate = useCallback(async (id: string, updates: Partial<ClassTimeTemplate>) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('class_time_templates')
       .update({
         label: updates.label,
@@ -440,7 +440,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const removeClassTemplate = useCallback(async (id: string) => {
-    const { error } = await supabase.from('class_time_templates').delete().eq('id', id);
+    const { error } = await (supabase as any).from('class_time_templates').delete().eq('id', id);
 
     if (!error) {
       setClassTemplates(prev => prev.filter(t => t.id !== id));
@@ -449,7 +449,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const bulkAddClassTemplates = useCallback(
     async (templates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[]) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('class_time_templates')
         .insert(
           templates.map(t => ({
@@ -485,7 +485,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const copyClassTemplatesToStudent = useCallback(async (studentId: string, classId: string) => {
     // Chamar função SQL para copiar templates
-    await supabase.rpc('copy_class_templates_to_student', {
+    await (supabase as any).rpc('copy_class_templates_to_student', {
       p_student_id: studentId,
       p_class_id: classId,
     });
