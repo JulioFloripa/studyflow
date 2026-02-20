@@ -5,24 +5,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ClassTimeTemplate, TIME_SLOTS, DAY_LABELS_SHORT } from '@/types/educational';
-import { Plus, Trash2, Clock } from 'lucide-react';
+import { ClassTimeTemplate, Student, TIME_SLOTS, DAY_LABELS_SHORT } from '@/types/educational';
+import { Plus, Trash2, Clock, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ClassTimeEditorProps {
   classId: string;
   templates: ClassTimeTemplate[];
+  students: Student[];
   onAdd: (template: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onBulkAdd: (templates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
+  onSyncToStudents: (studentId: string, classId: string) => Promise<void>;
 }
 
 export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
   classId,
   templates,
+  students,
   onAdd,
   onRemove,
   onBulkAdd,
+  onSyncToStudents,
 }) => {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkDays, setBulkDays] = useState<number[]>([1, 2, 3, 4, 5]); // Seg-Sex
@@ -234,12 +238,38 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
       )}
 
       {templates.length > 0 && (
-        <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-          <p className="font-medium mb-1">ℹ️ Herança Automática</p>
-          <p>
-            Estes horários serão automaticamente copiados para todos os alunos desta turma.
-            Cada aluno pode personalizar sua grade individualmente depois.
-          </p>
+        <div className="space-y-3">
+          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+            <p className="font-medium mb-1">ℹ️ Aula dada é aula estudada!</p>
+            <p>
+              Sincronize estes horários com os alunos da turma para que a grade de cada um
+              já venha preenchida com os horários de aula.
+            </p>
+          </div>
+
+          {students.length > 0 ? (
+            <Button
+              variant="default"
+              className="w-full"
+              onClick={async () => {
+                try {
+                  for (const student of students) {
+                    await onSyncToStudents(student.id, classId);
+                  }
+                  toast.success(`Horários sincronizados com ${students.length} aluno(s)!`);
+                } catch (error) {
+                  toast.error('Erro ao sincronizar horários');
+                }
+              }}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Sincronizar com {students.length} Aluno(s)
+            </Button>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center">
+              Nenhum aluno vinculado a esta turma ainda.
+            </p>
+          )}
         </div>
       )}
     </div>

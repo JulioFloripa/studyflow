@@ -25,6 +25,7 @@ const Classes = () => {
     addClassTemplate,
     removeClassTemplate,
     bulkAddClassTemplates,
+    copyClassTemplatesToStudent,
   } = useEducational();
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -249,9 +250,11 @@ const Classes = () => {
                   <ClassTimeEditor
                     classId={classItem.id}
                     templates={classTemplates.filter(t => t.classId === classItem.id)}
+                    students={students.filter(s => s.classId === classItem.id)}
                     onAdd={addClassTemplate}
                     onRemove={removeClassTemplate}
                     onBulkAdd={bulkAddClassTemplates}
+                    onSyncToStudents={copyClassTemplatesToStudent}
                   />
                 </DialogContent>
               </Dialog>
