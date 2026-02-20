@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Edit2, Trash2, Copy, Zap } from 'lucide-react';
-import { TimeSlot, TimeSlotStatus, TIME_SLOTS, DAY_LABELS_SHORT } from '@/types/educational';
+import { TimeSlot, TimeSlotStatus, TIME_SLOTS, DAY_LABELS_SHORT, ScheduleSubject } from '@/types/educational';
 import { cn } from '@/lib/utils';
 
 interface TimeGridEditorProps {
   timeSlots: TimeSlot[];
+  scheduleSubjects?: ScheduleSubject[];
   onUpdateSlot: (slotId: string, updates: Partial<TimeSlot>) => void;
   onBulkUpdate: (slots: Partial<TimeSlot>[]) => void;
   readonly?: boolean;
@@ -32,6 +33,7 @@ const STATUS_LABELS: Record<TimeSlotStatus, string> = {
 
 export const TimeGridEditor: React.FC<TimeGridEditorProps> = ({
   timeSlots,
+  scheduleSubjects = [],
   onUpdateSlot,
   onBulkUpdate,
   readonly = false,
@@ -123,10 +125,23 @@ export const TimeGridEditor: React.FC<TimeGridEditorProps> = ({
     if (!slot) return { label: '', color: 'bg-gray-50' };
 
     if (slot.status === 'custom' && slot.customLabel) {
+      const subjectName = slot.subjectId
+        ? scheduleSubjects.find(s => s.id === slot.subjectId)?.name
+        : undefined;
       return {
-        label: slot.customLabel,
+        label: subjectName ? `${subjectName}` : slot.customLabel,
         color: STATUS_COLORS.custom,
       };
+    }
+
+    if (slot.status === 'occupied' && slot.subjectId) {
+      const subjectName = scheduleSubjects.find(s => s.id === slot.subjectId)?.name;
+      if (subjectName) {
+        return {
+          label: subjectName,
+          color: STATUS_COLORS.occupied,
+        };
+      }
     }
 
     return {
