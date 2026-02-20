@@ -4,7 +4,8 @@ import { useStudy } from '@/contexts/StudyContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Download, RefreshCw, Clock, BookOpen, Target } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, Download, RefreshCw, Clock, BookOpen, Target, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateSmartCycleV2, formatCycleForWeek } from '@/lib/cycleGeneratorV2';
 import { DAY_LABELS } from '@/types/educational';
@@ -12,10 +13,17 @@ import { downloadReportPDF } from '@/lib/pdfGenerator';
 import type { StudyCycleResult } from '@/lib/cycleGeneratorV2';
 
 const StudentCycle = () => {
-  const { students, selectedStudent, timeSlots } = useEducational();
+  const { students, selectedStudent, selectStudent, timeSlots } = useEducational();
   const { subjects, topics } = useStudy();
   const [cycle, setCycle] = useState<StudyCycleResult | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  // Auto-selecionar se há apenas um aluno
+  useEffect(() => {
+    if (!selectedStudent && students.length === 1) {
+      selectStudent(students[0]);
+    }
+  }, [students, selectedStudent, selectStudent]);
 
   const handleGenerateCycle = async () => {
     if (!selectedStudent) {
@@ -100,10 +108,45 @@ const StudentCycle = () => {
         </div>
       </div>
 
+      {/* Seletor de aluno */}
+      {students.length > 0 && (
+        <div className="mb-6">
+          <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Aluno
+          </label>
+          <Select
+            value={selectedStudent?.id || ''}
+            onValueChange={(value) => {
+              const student = students.find(s => s.id === value);
+              if (student) {
+                selectStudent(student);
+                setCycle(null);
+              }
+            }}
+          >
+            <SelectTrigger className="w-full max-w-sm">
+              <SelectValue placeholder="Selecione um aluno..." />
+            </SelectTrigger>
+            <SelectContent>
+              {students.map(student => (
+                <SelectItem key={student.id} value={student.id}>
+                  {student.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {!selectedStudent ? (
         <Card className="p-12 text-center">
           <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Selecione um aluno na página de Alunos</p>
+          <p className="text-muted-foreground">
+            {students.length === 0 
+              ? 'Cadastre alunos na página de Alunos primeiro'
+              : 'Selecione um aluno acima para gerar o ciclo'}
+          </p>
         </Card>
       ) : !cycle ? (
         <Card className="p-12 text-center">
