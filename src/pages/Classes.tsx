@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useEducational } from '@/contexts/EducationalContext';
-import { useStudy } from '@/contexts/StudyContext';
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ const Classes = () => {
     classes,
     students,
     classTemplates,
+    scheduleSubjects,
     addClass,
     updateClass,
     removeClass,
@@ -26,9 +27,8 @@ const Classes = () => {
     addClassTemplate,
     removeClassTemplate,
     bulkAddClassTemplates,
+    addScheduleSubject,
   } = useEducational();
-  
-  const { subjects } = useStudy();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
@@ -252,10 +252,11 @@ const Classes = () => {
                   <ClassTimeEditor
                     classId={classItem.id}
                     templates={classTemplates.filter(t => t.classId === classItem.id)}
-                    subjects={subjects}
+                    scheduleSubjects={scheduleSubjects}
                     onAdd={addClassTemplate}
                     onRemove={removeClassTemplate}
                     onBulkAdd={bulkAddClassTemplates}
+                    onAddScheduleSubject={addScheduleSubject}
                   />
                 </DialogContent>
               </Dialog>

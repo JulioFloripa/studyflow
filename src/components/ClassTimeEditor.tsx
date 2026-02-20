@@ -4,37 +4,50 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ClassTimeTemplate, TIME_SLOTS, DAY_LABELS_SHORT, ScheduleType } from '@/types/educational';
-import { Subject } from '@/types/study';
+import { ClassTimeTemplate, TIME_SLOTS, DAY_LABELS_SHORT, ScheduleType, ScheduleSubject } from '@/types/educational';
 import { Plus, Trash2, Clock, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ClassTimeEditorProps {
   classId: string;
   templates: ClassTimeTemplate[];
-  subjects: Subject[]; // Lista de disciplinas disponíveis
+  scheduleSubjects: ScheduleSubject[];
   onAdd: (template: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onBulkAdd: (templates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
+  onAddScheduleSubject: (name: string, color?: string) => Promise<ScheduleSubject | null>;
 }
 
 export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
   classId,
   templates,
-  subjects,
+  scheduleSubjects,
   onAdd,
   onRemove,
   onBulkAdd,
+  onAddScheduleSubject,
 }) => {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
-  const [bulkDays, setBulkDays] = useState<number[]>([1, 2, 3, 4, 5]); // Seg-Sex
+  const [bulkDays, setBulkDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [bulkStartTime, setBulkStartTime] = useState('07:00');
   const [bulkEndTime, setBulkEndTime] = useState('12:00');
   const [bulkLabel, setBulkLabel] = useState('Aula');
   const [bulkColor, setBulkColor] = useState('#ef4444');
   const [bulkSubjectId, setBulkSubjectId] = useState<string>('');
   const [bulkScheduleType, setBulkScheduleType] = useState<ScheduleType>('class');
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [showNewSubjectInput, setShowNewSubjectInput] = useState(false);
+
+  const handleAddNewSubject = async () => {
+    if (!newSubjectName.trim()) return;
+    const created = await onAddScheduleSubject(newSubjectName.trim(), bulkColor);
+    if (created) {
+      setBulkSubjectId(created.id);
+      setNewSubjectName('');
+      setShowNewSubjectInput(false);
+      toast.success(`Disciplina "${created.name}" criada`);
+    }
+  };
 
   const handleBulkAdd = async () => {
     try {
@@ -45,7 +58,6 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
 
       const newTemplates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[] = [];
 
-      // Gerar todos os slots entre start e end
       const startIdx = TIME_SLOTS.indexOf(bulkStartTime);
       const endIdx = TIME_SLOTS.indexOf(bulkEndTime);
 
@@ -83,15 +95,13 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
     );
   };
 
-  // Agrupar templates por dia
   const templatesByDay: Record<number, ClassTimeTemplate[]> = {};
   templates.forEach(t => {
     if (!templatesByDay[t.dayOfWeek]) templatesByDay[t.dayOfWeek] = [];
     templatesByDay[t.dayOfWeek].push(t);
   });
 
-  // Mapear subject IDs para nomes
-  const subjectMap = new Map(subjects.map(s => [s.id, s.name]));
+  const subjectMap = new Map(scheduleSubjects.map(s => [s.id, s.name]));
 
   const getScheduleTypeLabel = (type?: ScheduleType) => {
     const labels: Record<ScheduleType, string> = {
@@ -136,20 +146,48 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
               {bulkScheduleType === 'class' && (
                 <div>
                   <Label>Disciplina *</Label>
-                  <Select value={bulkSubjectId} onValueChange={setBulkSubjectId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a disciplina" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {subjects.map(subject => (
-                        <SelectItem key={subject.id} value={subject.id}>
-                          {subject.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {!showNewSubjectInput ? (
+                    <>
+                      <Select value={bulkSubjectId} onValueChange={setBulkSubjectId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a disciplina" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {scheduleSubjects.map(subject => (
+                            <SelectItem key={subject.id} value={subject.id}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="mt-1 p-0 h-auto text-xs"
+                        onClick={() => setShowNewSubjectInput(true)}
+                      >
+                        + Criar nova disciplina
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={newSubjectName}
+                        onChange={e => setNewSubjectName(e.target.value)}
+                        placeholder="Nome da disciplina"
+                        className="flex-1"
+                      />
+                      <Button size="sm" onClick={handleAddNewSubject}>
+                        Criar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setShowNewSubjectInput(false)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    Isso permite gerar revisões automáticas baseadas nas aulas
+                    Disciplinas do horário são independentes do conteúdo de estudo
                   </p>
                 </div>
               )}

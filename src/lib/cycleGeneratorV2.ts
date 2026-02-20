@@ -1,4 +1,4 @@
-import { TimeSlot, Student, ScheduleType } from '@/types/educational';
+import { TimeSlot, Student, ScheduleType, ScheduleSubject } from '@/types/educational';
 import { Subject } from '@/types/study';
 
 export interface CycleSlot {
@@ -59,7 +59,7 @@ function timeToMinutes(time: string): number {
 /**
  * Extrai horários de aula do time_grid
  */
-function extractClassSchedule(timeSlots: TimeSlot[], subjects: Subject[]): ClassSession[] {
+function extractClassSchedule(timeSlots: TimeSlot[], scheduleSubjects: ScheduleSubject[]): ClassSession[] {
   const classSessions: ClassSession[] = [];
   
   // Filtrar apenas slots de aula presencial
@@ -68,7 +68,7 @@ function extractClassSchedule(timeSlots: TimeSlot[], subjects: Subject[]): Class
   );
   
   // Mapear subject IDs para nomes
-  const subjectMap = new Map(subjects.map(s => [s.id, s.name]));
+  const subjectMap = new Map(scheduleSubjects.map(s => [s.id, s.name]));
   
   // Agrupar slots consecutivos da mesma disciplina
   const byDay: Record<number, TimeSlot[]> = {};
@@ -260,10 +260,11 @@ export function generateSmartCycleV2(
   student: Student,
   timeSlots: TimeSlot[],
   subjects: Subject[],
-  topicsBySubject: Record<string, string[]>
+  topicsBySubject: Record<string, string[]>,
+  scheduleSubjects: ScheduleSubject[] = []
 ): StudyCycleResult {
-  // 1. Extrair horários de aula
-  const classSchedule = extractClassSchedule(timeSlots, subjects);
+  // 1. Extrair horários de aula (usando disciplinas do horário)
+  const classSchedule = extractClassSchedule(timeSlots, scheduleSubjects);
   
   // 2. Identificar blocos livres
   const freeBlocks = groupFreeSlots(timeSlots);
