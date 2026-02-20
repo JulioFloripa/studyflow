@@ -18,6 +18,7 @@ import SettingsPage from "@/pages/Settings";
 import Gamification from "@/pages/Gamification";
 import Classes from "@/pages/Classes";
 import Students from "@/pages/Students";
+import StudentCycle from "@/pages/StudentCycle";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -54,6 +55,7 @@ const App = () => (
                 <Route path="/configuracoes" element={<SettingsPage />} />
                 <Route path="/turmas" element={<Classes />} />
                 <Route path="/alunos" element={<Students />} />
+                <Route path="/ciclo-aluno" element={<StudentCycle />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
