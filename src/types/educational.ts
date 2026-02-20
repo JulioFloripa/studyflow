@@ -81,8 +81,21 @@ export interface TimeSlot {
   dayOfWeek: number; // 0=domingo, 1=segunda, ..., 6=sábado
   startTime: string; // "HH:MM" formato 24h
   status: TimeSlotStatus;
-  customLabel?: string;
+  label?: string;
   color?: string;
+  inheritedFromClass?: boolean; // Indica se foi herdado da turma
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClassTimeTemplate {
+  id: string;
+  classId: string;
+  dayOfWeek: number; // 0=domingo, 1=segunda, ..., 6=sábado
+  startTime: string; // "HH:MM" formato 24h
+  label: string; // Ex: "Aula", "Laboratório", "Estágio"
+  color?: string;
+  status: TimeSlotStatus;
   createdAt: string;
   updatedAt: string;
 }

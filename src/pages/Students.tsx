@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useEducational } from '@/contexts/EducationalContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ const Students = () => {
     selectStudent,
     updateTimeSlot,
     bulkUpdateTimeSlots,
+    copyClassTemplatesToStudent,
   } = useEducational();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -80,11 +82,33 @@ const Students = () => {
         await updateStudent(editingStudent.id, form);
         toast.success('Aluno atualizado!');
       } else {
+        // Criar aluno
         await addStudent(form as any);
-        toast.success('Aluno cadastrado!');
+        
+        // Se tiver turma, copiar horários automáticamente
+        if (form.classId) {
+          // Buscar o aluno recém criado
+          const { data: newStudent } = await supabase
+            .from('students')
+            .select('id')
+            .eq('full_name', form.fullName)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (newStudent) {
+            await copyClassTemplatesToStudent(newStudent.id, form.classId);
+            toast.success('Aluno cadastrado e horários herdados da turma!');
+          } else {
+            toast.success('Aluno cadastrado!');
+          }
+        } else {
+          toast.success('Aluno cadastrado!');
+        }
       }
       setDialogOpen(false);
     } catch (error) {
+      console.error(error);
       toast.error('Erro ao salvar aluno');
     }
   };

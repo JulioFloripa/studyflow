@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEducational } from '@/contexts/EducationalContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,21 +6,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Users, Plus, Edit2, Trash2, GraduationCap } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, GraduationCap, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Class } from '@/types/educational';
+import { ClassTimeEditor } from '@/components/ClassTimeEditor';
 
 const Classes = () => {
-  const { classes, students, addClass, updateClass, removeClass } = useEducational();
+  const {
+    classes,
+    students,
+    classTemplates,
+    addClass,
+    updateClass,
+    removeClass,
+    loadClassTemplates,
+    addClassTemplate,
+    removeClassTemplate,
+    bulkAddClassTemplates,
+  } = useEducational();
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [selectedClassForTemplates, setSelectedClassForTemplates] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     description: '',
     year: new Date().getFullYear(),
     semester: 1,
   });
+
+  // Carregar templates quando selecionar uma turma
+  useEffect(() => {
+    if (selectedClassForTemplates) {
+      loadClassTemplates(selectedClassForTemplates);
+    }
+  }, [selectedClassForTemplates, loadClassTemplates]);
 
   const handleOpenDialog = (classItem?: Class) => {
     if (classItem) {
@@ -80,15 +102,21 @@ const Classes = () => {
     return students.filter(s => s.classId === classId).length;
   };
 
+  const getTemplateCount = (classId: string) => {
+    return classTemplates.filter(t => t.classId === classId).length;
+  };
+
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
             <GraduationCap className="h-7 w-7" />
             Turmas
           </h1>
-          <p className="text-muted-foreground mt-1">Gerencie suas turmas e organize seus alunos</p>
+          <p className="text-muted-foreground mt-1">
+            Gerencie turmas e configure horários padrão
+          </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -97,58 +125,55 @@ const Classes = () => {
               Nova Turma
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{editingClass ? 'Editar Turma' : 'Nova Turma'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
+            <div className="space-y-4">
+              <div>
                 <Label>Nome da Turma *</Label>
                 <Input
                   value={form.name}
-                  onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Ex: 3º Ano A, Turma Medicina 2025"
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  placeholder="Ex: 3º Ano A - Medicina"
                 />
               </div>
-              <div className="space-y-2">
+
+              <div>
                 <Label>Descrição</Label>
                 <Textarea
                   value={form.description}
-                  onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Informações adicionais sobre a turma..."
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                  placeholder="Informações adicionais sobre a turma"
                   rows={3}
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div>
                   <Label>Ano</Label>
                   <Input
                     type="number"
                     value={form.year}
-                    onChange={e => setForm(prev => ({ ...prev, year: parseInt(e.target.value) }))}
+                    onChange={e => setForm({ ...form, year: parseInt(e.target.value) })}
                   />
                 </div>
-                <div className="space-y-2">
+
+                <div>
                   <Label>Semestre</Label>
                   <Input
                     type="number"
                     min="1"
                     max="2"
                     value={form.semester}
-                    onChange={e =>
-                      setForm(prev => ({ ...prev, semester: parseInt(e.target.value) }))
-                    }
+                    onChange={e => setForm({ ...form, semester: parseInt(e.target.value) })}
                   />
                 </div>
               </div>
-              <div className="flex gap-2 pt-2">
-                <Button onClick={handleSave} className="flex-1">
-                  Salvar
-                </Button>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancelar
-                </Button>
-              </div>
+
+              <Button onClick={handleSave} className="w-full">
+                {editingClass ? 'Atualizar' : 'Criar'} Turma
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -157,11 +182,11 @@ const Classes = () => {
       {classes.length === 0 ? (
         <Card className="p-12 text-center">
           <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Nenhuma turma criada ainda.</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Crie sua primeira turma para começar a organizar seus alunos.
+          <p className="text-muted-foreground mb-2">Nenhuma turma cadastrada</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Crie sua primeira turma para começar a gerenciar alunos
           </p>
-          <Button onClick={() => handleOpenDialog()} className="mt-4">
+          <Button onClick={() => handleOpenDialog()}>
             <Plus className="h-4 w-4 mr-2" />
             Criar Primeira Turma
           </Button>
@@ -169,43 +194,67 @@ const Classes = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {classes.map(classItem => (
-            <Card key={classItem.id} className="p-5 hover:shadow-lg transition-shadow">
+            <Card key={classItem.id} className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-lg text-foreground">{classItem.name}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-xs">
-                      {classItem.year}
-                      {classItem.semester ? `.${classItem.semester}` : ''}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      <Users className="h-3 w-3 mr-1" />
-                      {getStudentCount(classItem.id)} alunos
-                    </Badge>
-                  </div>
+                  <h3 className="font-semibold text-lg">{classItem.name}</h3>
+                  {classItem.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{classItem.description}</p>
+                  )}
                 </div>
                 <div className="flex gap-1">
                   <Button
+                    size="sm"
                     variant="ghost"
-                    size="icon"
                     onClick={() => handleOpenDialog(classItem)}
                   >
                     <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button
+                    size="sm"
                     variant="ghost"
-                    size="icon"
                     onClick={() => handleDelete(classItem.id)}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               </div>
-              {classItem.description && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {classItem.description}
-                </p>
-              )}
+
+              <div className="flex gap-2 mb-4">
+                <Badge variant="secondary">
+                  {classItem.year}/{classItem.semester}º Sem
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  {getStudentCount(classItem.id)} alunos
+                </Badge>
+              </div>
+
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setSelectedClassForTemplates(classItem.id)}
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    Horários ({getTemplateCount(classItem.id)})
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Horários - {classItem.name}</DialogTitle>
+                  </DialogHeader>
+                  <ClassTimeEditor
+                    classId={classItem.id}
+                    templates={classTemplates.filter(t => t.classId === classItem.id)}
+                    onAdd={addClassTemplate}
+                    onRemove={removeClassTemplate}
+                    onBulkAdd={bulkAddClassTemplates}
+                  />
+                </DialogContent>
+              </Dialog>
             </Card>
           ))}
         </div>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Class, Student, TimeSlot } from '@/types/educational';
+import { Class, Student, TimeSlot, ClassTimeTemplate } from '@/types/educational';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -8,6 +8,7 @@ interface EducationalContextType {
   classes: Class[];
   students: Student[];
   timeSlots: TimeSlot[];
+  classTemplates: ClassTimeTemplate[];
   selectedStudent: Student | null;
   loading: boolean;
   
@@ -15,6 +16,13 @@ interface EducationalContextType {
   addClass: (classData: Omit<Class, 'id' | 'coordinatorId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateClass: (id: string, updates: Partial<Class>) => Promise<void>;
   removeClass: (id: string) => Promise<void>;
+  
+  // Class Time Templates
+  loadClassTemplates: (classId: string) => Promise<void>;
+  addClassTemplate: (template: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateClassTemplate: (id: string, updates: Partial<ClassTimeTemplate>) => Promise<void>;
+  removeClassTemplate: (id: string) => Promise<void>;
+  bulkAddClassTemplates: (templates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
   
   // Students
   addStudent: (studentData: Omit<Student, 'id' | 'coordinatorId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -27,6 +35,7 @@ interface EducationalContextType {
   updateTimeSlot: (slotId: string, updates: Partial<TimeSlot>) => Promise<void>;
   bulkUpdateTimeSlots: (updates: Partial<TimeSlot>[]) => Promise<void>;
   initializeTimeGrid: (studentId: string) => Promise<void>;
+  copyClassTemplatesToStudent: (studentId: string, classId: string) => Promise<void>;
   
   // Refresh
   refreshData: () => Promise<void>;
@@ -45,6 +54,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [classTemplates, setClassTemplates] = useState<ClassTimeTemplate[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -353,17 +363,154 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     await supabase.rpc('initialize_time_grid', { p_student_id: studentId });
   }, []);
 
+  // Class Time Templates
+  const loadClassTemplates = useCallback(async (classId: string) => {
+    const { data } = await supabase
+      .from('class_time_templates')
+      .select('*')
+      .eq('class_id', classId)
+      .order('day_of_week')
+      .order('start_time');
+
+    if (data) {
+      setClassTemplates(
+        data.map((t: any) => ({
+          id: t.id,
+          classId: t.class_id,
+          dayOfWeek: t.day_of_week,
+          startTime: t.start_time,
+          label: t.label,
+          color: t.color,
+          status: t.status,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at,
+        }))
+      );
+    }
+  }, []);
+
+  const addClassTemplate = useCallback(
+    async (template: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const { data, error } = await supabase
+        .from('class_time_templates')
+        .insert({
+          class_id: template.classId,
+          day_of_week: template.dayOfWeek,
+          start_time: template.startTime,
+          label: template.label,
+          color: template.color,
+          status: template.status,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        setClassTemplates(prev => [
+          ...prev,
+          {
+            id: data.id,
+            classId: data.class_id,
+            dayOfWeek: data.day_of_week,
+            startTime: data.start_time,
+            label: data.label,
+            color: data.color,
+            status: data.status,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+          },
+        ]);
+      }
+    },
+    []
+  );
+
+  const updateClassTemplate = useCallback(async (id: string, updates: Partial<ClassTimeTemplate>) => {
+    const { error } = await supabase
+      .from('class_time_templates')
+      .update({
+        label: updates.label,
+        color: updates.color,
+        status: updates.status,
+      })
+      .eq('id', id);
+
+    if (!error) {
+      setClassTemplates(prev => prev.map(t => (t.id === id ? { ...t, ...updates } : t)));
+    }
+  }, []);
+
+  const removeClassTemplate = useCallback(async (id: string) => {
+    const { error } = await supabase.from('class_time_templates').delete().eq('id', id);
+
+    if (!error) {
+      setClassTemplates(prev => prev.filter(t => t.id !== id));
+    }
+  }, []);
+
+  const bulkAddClassTemplates = useCallback(
+    async (templates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+      const { data, error } = await supabase
+        .from('class_time_templates')
+        .insert(
+          templates.map(t => ({
+            class_id: t.classId,
+            day_of_week: t.dayOfWeek,
+            start_time: t.startTime,
+            label: t.label,
+            color: t.color,
+            status: t.status,
+          }))
+        )
+        .select();
+
+      if (!error && data) {
+        setClassTemplates(prev => [
+          ...prev,
+          ...data.map((t: any) => ({
+            id: t.id,
+            classId: t.class_id,
+            dayOfWeek: t.day_of_week,
+            startTime: t.start_time,
+            label: t.label,
+            color: t.color,
+            status: t.status,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+          })),
+        ]);
+      }
+    },
+    []
+  );
+
+  const copyClassTemplatesToStudent = useCallback(async (studentId: string, classId: string) => {
+    // Chamar função SQL para copiar templates
+    await supabase.rpc('copy_class_templates_to_student', {
+      p_student_id: studentId,
+      p_class_id: classId,
+    });
+    
+    // Recarregar grade do aluno
+    await loadTimeGrid(studentId);
+  }, [loadTimeGrid]);
+
   return (
     <EducationalContext.Provider
       value={{
         classes,
         students,
         timeSlots,
+        classTemplates,
         selectedStudent,
         loading,
         addClass,
         updateClass,
         removeClass,
+        loadClassTemplates,
+        addClassTemplate,
+        updateClassTemplate,
+        removeClassTemplate,
+        bulkAddClassTemplates,
         addStudent,
         updateStudent,
         removeStudent,
@@ -372,6 +519,7 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateTimeSlot,
         bulkUpdateTimeSlots,
         initializeTimeGrid,
+        copyClassTemplatesToStudent,
         refreshData,
       }}
     >
