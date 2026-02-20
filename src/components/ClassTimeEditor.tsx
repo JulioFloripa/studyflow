@@ -5,13 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ClassTimeTemplate, TIME_SLOTS, DAY_LABELS_SHORT } from '@/types/educational';
-import { Plus, Trash2, Clock } from 'lucide-react';
+import { ClassTimeTemplate, TIME_SLOTS, DAY_LABELS_SHORT, ScheduleType } from '@/types/educational';
+import { Subject } from '@/types/study';
+import { Plus, Trash2, Clock, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ClassTimeEditorProps {
   classId: string;
   templates: ClassTimeTemplate[];
+  subjects: Subject[]; // Lista de disciplinas disponíveis
   onAdd: (template: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onBulkAdd: (templates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
@@ -20,6 +22,7 @@ interface ClassTimeEditorProps {
 export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
   classId,
   templates,
+  subjects,
   onAdd,
   onRemove,
   onBulkAdd,
@@ -28,11 +31,18 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
   const [bulkDays, setBulkDays] = useState<number[]>([1, 2, 3, 4, 5]); // Seg-Sex
   const [bulkStartTime, setBulkStartTime] = useState('07:00');
   const [bulkEndTime, setBulkEndTime] = useState('12:00');
-  const [bulkLabel, setBulkLabel] = useState('Aula Presencial');
+  const [bulkLabel, setBulkLabel] = useState('Aula');
   const [bulkColor, setBulkColor] = useState('#ef4444');
+  const [bulkSubjectId, setBulkSubjectId] = useState<string>('');
+  const [bulkScheduleType, setBulkScheduleType] = useState<ScheduleType>('class');
 
   const handleBulkAdd = async () => {
     try {
+      if (bulkScheduleType === 'class' && !bulkSubjectId) {
+        toast.error('Selecione uma disciplina para horários de aula');
+        return;
+      }
+
       const newTemplates: Omit<ClassTimeTemplate, 'id' | 'createdAt' | 'updatedAt'>[] = [];
 
       // Gerar todos os slots entre start e end
@@ -53,6 +63,8 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
             label: bulkLabel,
             color: bulkColor,
             status: 'occupied',
+            subjectId: bulkSubjectId || undefined,
+            scheduleType: bulkScheduleType,
           });
         }
       }
@@ -78,6 +90,19 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
     templatesByDay[t.dayOfWeek].push(t);
   });
 
+  // Mapear subject IDs para nomes
+  const subjectMap = new Map(subjects.map(s => [s.id, s.name]));
+
+  const getScheduleTypeLabel = (type?: ScheduleType) => {
+    const labels: Record<ScheduleType, string> = {
+      class: '📚 Aula',
+      study: '✏️ Estudo',
+      free: '🆓 Livre',
+      other: '📌 Outro',
+    };
+    return labels[type || 'other'];
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -89,11 +114,46 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
               Preencher em Lote
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Preencher Horários em Lote</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div>
+                <Label>Tipo de Horário *</Label>
+                <Select value={bulkScheduleType} onValueChange={(v) => setBulkScheduleType(v as ScheduleType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="class">📚 Aula Presencial</SelectItem>
+                    <SelectItem value="study">✏️ Estudo Dirigido</SelectItem>
+                    <SelectItem value="other">📌 Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {bulkScheduleType === 'class' && (
+                <div>
+                  <Label>Disciplina *</Label>
+                  <Select value={bulkSubjectId} onValueChange={setBulkSubjectId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a disciplina" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map(subject => (
+                        <SelectItem key={subject.id} value={subject.id}>
+                          {subject.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Isso permite gerar revisões automáticas baseadas nas aulas
+                  </p>
+                </div>
+              )}
+
               <div>
                 <Label>Dias da Semana</Label>
                 <div className="flex gap-2 mt-2">
@@ -152,7 +212,7 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
                 <Input
                   value={bulkLabel}
                   onChange={e => setBulkLabel(e.target.value)}
-                  placeholder="Ex: Aula Presencial"
+                  placeholder="Ex: Aula de Biologia"
                 />
               </div>
 
@@ -215,7 +275,20 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-sm">{template.startTime}</span>
                             <span className="text-sm font-medium">{template.label}</span>
+                            {template.scheduleType && (
+                              <span className="text-xs text-muted-foreground">
+                                {getScheduleTypeLabel(template.scheduleType)}
+                              </span>
+                            )}
                           </div>
+                          {template.subjectId && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <BookOpen className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                {subjectMap.get(template.subjectId) || 'Disciplina'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <Button
                           size="sm"
@@ -235,10 +308,11 @@ export const ClassTimeEditor: React.FC<ClassTimeEditorProps> = ({
 
       {templates.length > 0 && (
         <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-          <p className="font-medium mb-1">ℹ️ Herança Automática</p>
+          <p className="font-medium mb-1">ℹ️ Herança Automática + "Aula Dada é Aula Estudada"</p>
           <p>
             Estes horários serão automaticamente copiados para todos os alunos desta turma.
-            Cada aluno pode personalizar sua grade individualmente depois.
+            Horários marcados como "Aula" com disciplina vinculada gerarão revisões automáticas
+            no ciclo de estudos (método "aula dada é aula estudada").
           </p>
         </div>
       )}

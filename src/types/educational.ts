@@ -75,6 +75,8 @@ export interface Student {
 
 export type TimeSlotStatus = 'free' | 'occupied' | 'custom';
 
+export type ScheduleType = 'class' | 'study' | 'free' | 'other';
+
 export interface TimeSlot {
   id: string;
   studentId: string;
@@ -83,6 +85,8 @@ export interface TimeSlot {
   status: TimeSlotStatus;
   label?: string;
   color?: string;
+  subjectId?: string; // Disciplina vinculada (ex: Biologia, Matemática)
+  scheduleType?: ScheduleType; // Tipo: aula, estudo, livre, outro
   inheritedFromClass?: boolean; // Indica se foi herdado da turma
   createdAt: string;
   updatedAt: string;
@@ -96,6 +100,8 @@ export interface ClassTimeTemplate {
   label: string; // Ex: "Aula", "Laboratório", "Estágio"
   color?: string;
   status: TimeSlotStatus;
+  subjectId?: string; // Disciplina vinculada
+  scheduleType?: ScheduleType; // Tipo: aula, estudo, livre, outro
   createdAt: string;
   updatedAt: string;
 }

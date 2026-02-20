@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Download, RefreshCw, Clock, BookOpen, Target } from 'lucide-react';
 import { toast } from 'sonner';
-import { generateSmartCycle, formatCycleForWeek } from '@/lib/cycleGenerator';
+import { generateSmartCycleV2, formatCycleForWeek } from '@/lib/cycleGeneratorV2';
 import { DAY_LABELS } from '@/types/educational';
 import { downloadReportPDF } from '@/lib/pdfGenerator';
-import type { StudyCycleResult } from '@/lib/cycleGenerator';
+import type { StudyCycleResult } from '@/lib/cycleGeneratorV2';
 
 const StudentCycle = () => {
   const { students, selectedStudent, timeSlots } = useEducational();
@@ -43,7 +43,7 @@ const StudentCycle = () => {
           .map(t => t.name);
       });
 
-      const generatedCycle = generateSmartCycle(
+      const generatedCycle = generateSmartCycleV2(
         selectedStudent,
         timeSlots,
         subjects,
