@@ -19,6 +19,7 @@ const Students = () => {
   const {
     students,
     classes,
+    scheduleSubjects,
     timeSlots,
     selectedStudent,
     addStudent,
@@ -286,6 +287,7 @@ const Students = () => {
                 <TabsContent value="schedule" className="mt-4">
                   <TimeGridEditor
                     timeSlots={timeSlots}
+                    scheduleSubjects={scheduleSubjects}
                     onUpdateSlot={updateTimeSlot}
                     onBulkUpdate={bulkUpdateTimeSlots}
                   />
