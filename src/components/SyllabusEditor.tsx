@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useEducational } from '@/contexts/EducationalContext';
+import { useStudy } from '@/contexts/StudyContext';
 import { ScheduleSubject, SyllabusItem } from '@/types/educational';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ import {
   PlayCircle,
   BookOpen,
   SkipForward,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -40,9 +42,12 @@ export const SyllabusEditor: React.FC<SyllabusEditorProps> = ({ scheduleSubjects
     advanceSyllabus,
   } = useEducational();
 
+  const { subjects: studySubjects, topics: studyTopics } = useStudy();
+
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [newItemName, setNewItemName] = useState('');
   const [newItemWeek, setNewItemWeek] = useState<string>('');
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     if (selectedSubjectId) {
@@ -89,6 +94,59 @@ export const SyllabusEditor: React.FC<SyllabusEditorProps> = ({ scheduleSubjects
       { id: items[index].id, sortOrder: orderB },
       { id: items[swapIdx].id, sortOrder: orderA },
     ]);
+  };
+
+  const handleImportFromStudyPlan = async () => {
+    if (!selectedSubjectId) return;
+    
+    const schedSubject = scheduleSubjects.find(s => s.id === selectedSubjectId);
+    if (!schedSubject) return;
+
+    // Match by name (case-insensitive)
+    const matchingStudySubject = studySubjects.find(
+      s => s.name.toLowerCase().trim() === schedSubject.name.toLowerCase().trim()
+    );
+
+    if (!matchingStudySubject) {
+      toast.error(`Nenhuma disciplina encontrada no edital com o nome "${schedSubject.name}"`);
+      return;
+    }
+
+    const matchingTopics = studyTopics.filter(t => t.subjectId === matchingStudySubject.id);
+    if (matchingTopics.length === 0) {
+      toast.error(`A disciplina "${matchingStudySubject.name}" não possui assuntos no edital`);
+      return;
+    }
+
+    // Check existing items to avoid duplicates
+    const existingNames = new Set(filteredItems.map(i => i.name.toLowerCase().trim()));
+    const newTopics = matchingTopics.filter(t => !existingNames.has(t.name.toLowerCase().trim()));
+
+    if (newTopics.length === 0) {
+      toast.info('Todos os assuntos já estão na ementa');
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const maxOrder = filteredItems.length > 0
+        ? Math.max(...filteredItems.map(i => i.sortOrder))
+        : -1;
+
+      for (let i = 0; i < newTopics.length; i++) {
+        await addSyllabusItem({
+          scheduleSubjectId: selectedSubjectId,
+          name: newTopics[i].name,
+          sortOrder: maxOrder + 1 + i,
+          status: filteredItems.length === 0 && i === 0 ? 'current' : 'pending',
+        });
+      }
+
+      await loadSyllabusItems(selectedSubjectId);
+      toast.success(`${newTopics.length} conteúdos importados do edital!`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleRemove = async (id: string) => {
@@ -208,7 +266,27 @@ export const SyllabusEditor: React.FC<SyllabusEditorProps> = ({ scheduleSubjects
             </Button>
           </div>
 
-          {/* Botão avançar */}
+          {/* Importar do edital */}
+          {(() => {
+            const schedSubject = scheduleSubjects.find(s => s.id === selectedSubjectId);
+            const hasMatch = schedSubject && studySubjects.some(
+              s => s.name.toLowerCase().trim() === schedSubject.name.toLowerCase().trim()
+            );
+            return hasMatch ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImportFromStudyPlan}
+                disabled={importing}
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {importing ? 'Importando...' : 'Importar conteúdos do Edital'}
+              </Button>
+            ) : null;
+          })()}
+
+
           {filteredItems.some(i => i.status === 'current') && (
             <Button variant="outline" size="sm" onClick={handleAdvance} className="w-full">
               <SkipForward className="h-4 w-4 mr-2" />
