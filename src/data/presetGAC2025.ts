@@ -3,136 +3,177 @@ import { PresetExam } from '@/types/study';
 /**
  * Preset GAC 2025 - Pré-Vestibular
  * Baseado na ementa oficial do curso Fleming para as regiões PV RS-SC
- * Estrutura de estudos semana a semana de Biologia (Frentes A e B)
+ * Estrutura de estudos semana a semana de Biologia, Física e Química (Frentes A e B)
  */
 export const presetGAC2025: PresetExam = {
-  id: 'gac-2025-biologia',
-  name: 'GAC 2025 - Biologia Pré-Vestibular',
-  description: 'Curso preparatório completo de Biologia para vestibulares (Fleming PV RS-SC) — Frentes A e B com cronograma de fevereiro a outubro',
+  id: 'gac-2025',
+  name: 'GAC 2025 - Fleming Pré-Vestibular',
+  description: 'Guia de Andamento do Curso 2025 - Fleming (RS e SC) - Conteúdo programático completo de Biologia, Física e Química',
   subjects: [
+    // ==================== BIOLOGIA ====================
     {
-      name: 'Biologia - Frente A: Fundamentos e Evolução',
+      name: 'Biologia',
       priority: 5,
       topics: [
-        // Livro 1 - Semanas 1-9
-        'Organização e Características dos Seres Vivos',
-        'Composição Química: Água e Sais Minerais',
-        'Composição Química: Proteínas e Enzimas',
-        'Composição Química: Carboidratos e Lipídios',
+        // FRENTE A - Livro 1
+        'Organização e características dos seres vivos',
+        'Composição química dos seres vivos',
         'Código Genético e Síntese Proteica',
-        'Replicação, Transcrição e Tradução',
-        'Origem da Vida e Teorias Evolutivas',
-        'Mecanismos Evolutivos e Especiação',
-      ],
-    },
-    {
-      name: 'Biologia - Frente A: Classificação e Microbiologia',
-      priority: 5,
-      topics: [
-        // Livro 2 - Semanas 10-18
-        'Classificação dos Seres Vivos e Taxonomia',
-        'Vírus: Estrutura e Ciclo de Vida',
-        'Bactérias e Bacterioses',
-        'Reino Protoctista: Algas e Protozoários',
-        'Reino Fungi: Estrutura e Reprodução',
-      ],
-    },
-    {
-      name: 'Biologia - Frente A: Botânica',
-      priority: 4,
-      topics: [
-        // Livro 3 - Semanas 19-28
-        'Reino Vegetal I: Briófitas e Pteridófitas',
-        'Reino Vegetal II: Gimnospermas e Angiospermas',
-        'Histologia Vegetal: Meristemas e Tecidos',
-        'Fisiologia Vegetal: Fotossíntese e Transporte',
-        'Hormônios Vegetais e Tropismos',
-        'Organografia Vegetal: Raiz, Caule e Folha',
-        'Reprodução Vegetal: Flores, Frutos e Sementes',
-      ],
-    },
-    {
-      name: 'Biologia - Frente A: Zoologia',
-      priority: 4,
-      topics: [
-        // Livro 3-4 - Semanas 27-36
-        'Poríferos e Cnidários',
-        'Platelmintos e Nematelmintos',
+        'Origem da vida e Evolução',
+        // FRENTE A - Livro 2
+        'Classificação dos seres vivos',
+        'Vírus e Bacteriófagos',
+        'Procariontes e Bacterioses',
+        'Reino Protoctista',
+        'Reino Fungi',
+        // FRENTE A - Livro 3
+        'Reino Vegetal I e II',
+        'Histologia e Fisiologia Vegetal',
+        'Organografia vegetal',
+        'Reino Animal I: Poríferos e Cnidários',
+        'Reino Animal II: Platelmintos e nematelmíntos',
+        // FRENTE A - Livro 4
         'Moluscos e Anelídeos',
-        'Artrópodes: Insetos, Aracnídeos e Crustáceos',
-        'Equinodermos',
-        'Cordados I: Peixes (Agnatos, Condrictes, Osteíctes)',
-        'Cordados II: Anfíbios e Répteis',
-        'Cordados III: Aves e Mamíferos',
-      ],
-    },
-    {
-      name: 'Biologia - Frente B: Citologia e Genética',
-      priority: 5,
-      topics: [
-        // Livro 1 - Semanas 1-9
+        'Artrópodes',
+        'Equinodermos e Cordados I',
+        'Cordados II: Agnatos, Condríctes e Osteíctes',
+        'Anfíbios e Répteis',
+        'Aves e Mamíferos',
+        // FRENTE B - Livro 1
         'Núcleo Interfásico e Ploidia Celular',
-        'Ciclo Celular: Mitose e Meiose',
-        'Genética I: Leis de Mendel',
-        'Genética II: Polialelia, Epistasia e Genes Múltiplos',
-        'Herança Sexual e Cromossomos Sexuais',
-        'Genes Ligados e Recombinação Gênica',
-        'Mutações Cromossômicas e Síndromes',
+        'Ciclo celular e divisões celulares',
+        'Genética I e II',
+        'Herança Sexual',
+        'Genes Ligados',
+        'Mutações cromossômicas',
+        // FRENTE B - Livro 2
+        'Citologia',
+        'Bioenergética',
+        'Reprodução animal e gametogênese',
+        'Embriologia animal',
+        'Tecido Epitelial',
+        'Tecidos conjuntivos',
+        'Tecido muscular e tecido nervoso',
+        // FRENTE B - Livro 3
+        'Sistema Digestório',
+        'Sistema Cardiovascular e Linfático',
+        'Sistema Imunológico e Respiratório',
+        'Sistema Excretor',
+        'Sistema endócrino e reprodutor',
+        'Sistema nervoso',
+        'Sistema sensorial',
+        // FRENTE B - Livro 4
+        'Introdução à ecologia',
+        'Dinâmica de populações e relações ecológicas',
+        'Sucessão ecológica e biogeografia',
+        'Ciclos biogeoquímicos',
+        'Influência antrópica nos ecossistemas',
+        'Biotecnologia',
       ],
     },
+    // ==================== FÍSICA ====================
     {
-      name: 'Biologia - Frente B: Citologia e Bioenergética',
+      name: 'Física',
       priority: 5,
       topics: [
-        // Livro 2 - Semanas 10-18
-        'Citologia: Organelas e Funções Celulares',
-        'Membrana Plasmática e Transporte',
-        'Bioenergética: Fotossíntese',
-        'Bioenergética: Respiração Celular e Fermentação',
-        'Reprodução Animal e Gametogênese',
-        'Embriologia Animal: Segmentação e Gastrulação',
-        'Tecido Epitelial',
-        'Tecidos Conjuntivos: Adiposo, Ósseo e Cartilaginoso',
-        'Tecido Muscular e Tecido Nervoso',
+        // FRENTE A - Livro 1
+        'Ondulatória - Classificação das Ondas',
+        'Ondulatória - Espectro Eletromagnético',
+        'Ondulatória - Fenômenos Ondulatórios',
+        'Ondulatória - Acústica',
+        // FRENTE A - Livro 2
+        'Hidrostática - Conceitos Básicos',
+        'Hidrostática - Teorema e Princípios',
+        'Hidrodinâmica',
+        'Cinemática - Conceitos Básicos e Movimentos Retilíneos',
+        // FRENTE A - Livro 3
+        'Cinemática - Movimentos Curvilíneos',
+        'Estática dos Sólidos',
+        'Movimento Harmônico Simples',
+        'Eletrostática - Cargas elétricas',
+        'Eletrostática - Campos Elétricos',
+        'Eletrostática - Potencial Elétrico',
+        // FRENTE A - Livro 4
+        'Eletrodinâmica - Corrente e Resistência',
+        'Eletrodinâmica - Circuitos Elétricos',
+        'Eletrodinâmica - Capacitores',
+        'Física Moderna - Noções de Física Nuclear',
+        // FRENTE B - Livro 1
+        'Óptica Geométrica - Fundamentos, Reflexão da Luz e Espelhos Planos',
+        'Óptica Geométrica - Reflexão nos Espelhos Esféricos',
+        'Óptica Geométrica - Refração da Luz',
+        'Óptica Geométrica - Lentes Esféricas Delgadas',
+        // FRENTE B - Livro 2
+        'Termologia - Termometria e Dilatação Térmica',
+        'Termologia - Calorimetria',
+        'Termodinâmica - Gases ideais e 1ª Lei',
+        'Termodinâmica - Máquinas térmicas e 2ª Lei',
+        // FRENTE B - Livro 3
+        'Dinâmica - Leis de Newton',
+        'Dinâmica - Trabalho Mecânico, Potência e Energia Mecânica',
+        'Dinâmica - Quantidade de Movimento Linear e Impulso',
+        'Dinâmica - Gravitação Universal',
+        // FRENTE B - Livro 4
+        'Magnetismo',
+        'Eletromagnetismo - Campo Magnético gerado por Corrente Elétrica',
+        'Eletromagnetismo - Força Magnética',
+        'Eletromagnetismo - Indução Eletromagnética',
+        'Física Moderna - Noções de Física Quântica',
+        'Física Moderna - Teoria da Relatividade Restrita',
       ],
     },
+    // ==================== QUÍMICA ====================
     {
-      name: 'Biologia - Frente B: Fisiologia Humana I',
-      priority: 4,
+      name: 'Química',
+      priority: 5,
       topics: [
-        // Livro 3 - Semanas 16-28
-        'Sistema Digestório',
-        'Sistema Cardiovascular e Circulação',
-        'Sistema Linfático',
-        'Sistema Imunológico: Imunidade Inata e Adaptativa',
-        'Sistema Respiratório e Trocas Gasosas',
-        'Sistema Excretor: Rins e Néfrons',
-      ],
-    },
-    {
-      name: 'Biologia - Frente B: Fisiologia Humana II',
-      priority: 4,
-      topics: [
-        // Livro 3 - Semanas 20-27
-        'Sistema Endócrino: Glândulas e Hormônios',
-        'Sistema Reprodutor e Ciclo Menstrual',
-        'Sistema Nervoso: Central e Periférico',
-        'Sistema Sensorial: Visão, Audição e Outros Sentidos',
-      ],
-    },
-    {
-      name: 'Biologia - Frente B: Ecologia e Biotecnologia',
-      priority: 4,
-      topics: [
-        // Livro 4 - Semanas 27-36
-        'Introdução à Ecologia: População e Comunidade',
-        'Dinâmica de Populações e Relações Ecológicas',
-        'Sucessão Ecológica e Biogeografia',
-        'Biomas Terrestres e Aquáticos',
-        'Ciclos Biogeoquímicos: Carbono, Nitrogênio e Água',
-        'Influência Antrópica e Problemas Ambientais',
-        'Biotecnologia: Engenharia Genética e Transgênicos',
-        'Biotecnologia: Aplicações Médicas e Terapia Gênica',
+        // FRENTE A - Livro 1
+        'Estrutura Atômica I',
+        'Estrutura Atômica II',
+        'Tabela Periódica',
+        'Ligações Químicas I e II',
+        'Geometria Molecular',
+        // FRENTE A - Livro 2
+        'Forças Intermoleculares',
+        'Ácidos',
+        'Bases',
+        'Sais',
+        'Óxidos',
+        'Teorias Modernas de ácido-base',
+        'Reações Inorgânicas',
+        // FRENTE A - Livro 3
+        'Cálculos Químicos',
+        'Gases',
+        'Termoquímica',
+        'Soluções',
+        'Propriedades Coligativas',
+        // FRENTE A - Livro 4
+        'Cinética Química',
+        'Equilíbrio Químico',
+        'Deslocamento do Equilíbrio',
+        'Equilíbrio Iônico (ácido, base, sal e água)',
+        // FRENTE B - Livro 1
+        'Propriedades da Matéria',
+        'Substâncias e misturas',
+        'Soluções, Suspesões e Coloides',
+        'Separações de misturas',
+        'Polaridade',
+        'Polaridade em Compostos Orgânicos',
+        // FRENTE B - Livro 2
+        'Introdução à Química Orgânica',
+        'Hidrocarbonetos',
+        'Funções Oxigenadas I e II',
+        'Funções Nitrogenadas e especiais',
+        'Reconhecimento das funções orgânicas',
+        // FRENTE B - Livro 3
+        'Isomeria Constitucional',
+        'Isomeria Espacial',
+        'Reações Orgânicas I, II e III',
+        // FRENTE B - Livro 4
+        'Eletroquímica',
+        'Radioatividade',
+        'Polímeros',
+        'Bioquímica',
       ],
     },
   ],
