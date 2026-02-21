@@ -131,6 +131,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
             specialNeeds: s.special_needs,
             academicHistory: s.academic_history,
             notes: s.notes,
+            availability: s.availability,
+            reviewIntervals: s.review_intervals,
+            weeklyGoalHours: s.weekly_goal_hours,
+            examDate: s.exam_date,
+            objective: s.objective,
             createdAt: s.created_at,
             updatedAt: s.updated_at,
           }))
@@ -405,6 +410,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
           special_needs: studentData.specialNeeds || null,
           academic_history: studentData.academicHistory || null,
           notes: studentData.notes || null,
+          availability: studentData.availability || {"dom": 4, "qua": 2, "qui": 2, "sab": 4, "seg": 2, "sex": 2, "ter": 2},
+          review_intervals: studentData.reviewIntervals || [1, 7, 30],
+          weekly_goal_hours: studentData.weeklyGoalHours || 20,
+          exam_date: studentData.examDate || null,
+          objective: studentData.objective || '',
         })
         .select()
         .single();
@@ -428,6 +438,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
           specialNeeds: data.special_needs,
           academicHistory: data.academic_history as any,
           notes: data.notes,
+          availability: data.availability,
+          reviewIntervals: data.review_intervals,
+          weeklyGoalHours: data.weekly_goal_hours,
+          examDate: data.exam_date,
+          objective: data.objective,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
         };
@@ -458,6 +473,11 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         special_needs: updates.specialNeeds,
         academic_history: updates.academicHistory as any,
         notes: updates.notes,
+        availability: updates.availability,
+        review_intervals: updates.reviewIntervals,
+        weekly_goal_hours: updates.weeklyGoalHours,
+        exam_date: updates.examDate,
+        objective: updates.objective,
       })
       .eq('id', id);
 

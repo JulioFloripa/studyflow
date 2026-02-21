@@ -92,6 +92,13 @@ export interface Student {
   // Observações
   notes?: string;
   
+  // Configurações de Estudo
+  availability?: Record<string, number>;
+  reviewIntervals?: number[];
+  weeklyGoalHours?: number;
+  examDate?: string;
+  objective?: string;
+  
   createdAt: string;
   updatedAt: string;
 }
