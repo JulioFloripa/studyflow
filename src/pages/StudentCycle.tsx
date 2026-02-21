@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Download, RefreshCw, Clock, BookOpen, Target, Users } from 'lucide-react';
+import { Calendar, Download, RefreshCw, Clock, BookOpen, Target, Users, AlertTriangle, CheckCircle, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateSmartCycleV2, formatCycleForWeek } from '@/lib/cycleGeneratorV2';
 import { DAY_LABELS } from '@/types/educational';
@@ -295,6 +295,98 @@ const StudentCycle = () => {
               })}
             </div>
           </Card>
+
+          {/* Diagnóstico de Equilíbrio */}
+          {cycle.diagnostic && (
+            <Card className="p-5">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Diagnóstico de Equilíbrio
+                {cycle.diagnostic.isBalanced ? (
+                  <Badge variant="default" className="ml-2 bg-green-600 text-white">
+                    <CheckCircle className="h-3 w-3 mr-1" /> Equilibrado
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="ml-2">
+                    <AlertTriangle className="h-3 w-3 mr-1" /> Desequilibrado
+                  </Badge>
+                )}
+              </h3>
+
+              {/* Métricas */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="p-3 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground">Desvio Padrão</p>
+                  <p className={`text-lg font-bold ${cycle.diagnostic.standardDeviation <= 1.5 ? 'text-green-600' : 'text-destructive'}`}>
+                    {cycle.diagnostic.standardDeviation}h
+                  </p>
+                  <p className="text-xs text-muted-foreground">ideal ≤ 1.5h</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground">Amplitude</p>
+                  <p className={`text-lg font-bold ${cycle.diagnostic.range <= 3 ? 'text-green-600' : 'text-destructive'}`}>
+                    {cycle.diagnostic.range}h
+                  </p>
+                  <p className="text-xs text-muted-foreground">ideal ≤ 3h</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground">Máx/dia</p>
+                  <p className={`text-lg font-bold ${cycle.diagnostic.maxDailyHours <= 10 ? 'text-green-600' : 'text-destructive'}`}>
+                    {cycle.diagnostic.maxDailyHours}h
+                  </p>
+                  <p className="text-xs text-muted-foreground">limite: 10h</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground">Mín/dia</p>
+                  <p className="text-lg font-bold text-foreground">
+                    {cycle.diagnostic.minDailyHours}h
+                  </p>
+                </div>
+              </div>
+
+              {/* Horas por dia */}
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-2">Distribuição Diária</p>
+                <div className="grid grid-cols-7 gap-1">
+                  {[1, 2, 3, 4, 5, 6, 0].map(day => {
+                    const hours = cycle.diagnostic.dailyHours[day] || 0;
+                    const maxH = cycle.diagnostic.maxDailyHours || 1;
+                    const pct = maxH > 0 ? (hours / Math.max(maxH, 10)) * 100 : 0;
+                    return (
+                      <div key={day} className="text-center">
+                        <p className="text-xs text-muted-foreground">{DAY_LABELS[day]?.slice(0, 3)}</p>
+                        <div className="h-16 bg-muted/30 rounded relative mt-1">
+                          <div
+                            className={`absolute bottom-0 w-full rounded ${hours > 10 ? 'bg-destructive' : 'bg-primary'}`}
+                            style={{ height: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs font-medium mt-1">{hours}h</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Alertas */}
+              {cycle.diagnostic.alerts.length > 0 && (
+                <div className="space-y-1 mb-3">
+                  {cycle.diagnostic.alerts.map((alert, idx) => (
+                    <p key={idx} className="text-sm text-destructive">{alert}</p>
+                  ))}
+                </div>
+              )}
+
+              {/* Sugestões */}
+              {cycle.diagnostic.suggestions.length > 0 && (
+                <div className="space-y-1">
+                  {cycle.diagnostic.suggestions.map((sug, idx) => (
+                    <p key={idx} className="text-sm text-muted-foreground">{sug}</p>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
 
           {/* Recomendações */}
           <Card className="p-5">
