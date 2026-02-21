@@ -267,66 +267,81 @@ export type Database = {
       students: {
         Row: {
           academic_history: Json | null
+          availability: Json | null
           birth_date: string | null
           class_id: string | null
           coordinator_id: string
           created_at: string
           current_grade: string | null
           email: string | null
+          exam_date: string | null
           full_name: string
           id: string
           learning_pace: string | null
           learning_style: Json | null
           notes: string | null
+          objective: string | null
           phone: string | null
+          review_intervals: Json | null
           special_needs: string | null
           study_methods: string[] | null
           target_career: string | null
           target_university: string | null
           updated_at: string
           user_id: string | null
+          weekly_goal_hours: number | null
         }
         Insert: {
           academic_history?: Json | null
+          availability?: Json | null
           birth_date?: string | null
           class_id?: string | null
           coordinator_id: string
           created_at?: string
           current_grade?: string | null
           email?: string | null
+          exam_date?: string | null
           full_name: string
           id?: string
           learning_pace?: string | null
           learning_style?: Json | null
           notes?: string | null
+          objective?: string | null
           phone?: string | null
+          review_intervals?: Json | null
           special_needs?: string | null
           study_methods?: string[] | null
           target_career?: string | null
           target_university?: string | null
           updated_at?: string
           user_id?: string | null
+          weekly_goal_hours?: number | null
         }
         Update: {
           academic_history?: Json | null
+          availability?: Json | null
           birth_date?: string | null
           class_id?: string | null
           coordinator_id?: string
           created_at?: string
           current_grade?: string | null
           email?: string | null
+          exam_date?: string | null
           full_name?: string
           id?: string
           learning_pace?: string | null
           learning_style?: Json | null
           notes?: string | null
+          objective?: string | null
           phone?: string | null
+          review_intervals?: Json | null
           special_needs?: string | null
           study_methods?: string[] | null
           target_career?: string | null
           target_university?: string | null
           updated_at?: string
           user_id?: string | null
+          weekly_goal_hours?: number | null
         }
         Relationships: [
           {

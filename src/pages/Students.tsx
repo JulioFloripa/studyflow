@@ -46,6 +46,11 @@ const Students = () => {
     studyMethods: [],
     specialNeeds: '',
     notes: '',
+    availability: { seg: 2, ter: 2, qua: 2, qui: 2, sex: 2, sab: 4, dom: 4 },
+    reviewIntervals: [1, 7, 30],
+    weeklyGoalHours: 20,
+    examDate: '',
+    objective: 'ENEM',
   });
 
   const handleOpenDialog = (student?: Student) => {
@@ -67,6 +72,11 @@ const Students = () => {
         studyMethods: [],
         specialNeeds: '',
         notes: '',
+        availability: { seg: 2, ter: 2, qua: 2, qui: 2, sex: 2, sab: 4, dom: 4 },
+        reviewIntervals: [1, 7, 30],
+        weeklyGoalHours: 20,
+        examDate: '',
+        objective: 'ENEM',
       });
     }
     setDialogOpen(true);
@@ -281,6 +291,28 @@ const Students = () => {
                         <p className="text-sm mt-1">{selectedStudent.notes}</p>
                       </div>
                     )}
+
+                    <div className="mt-4 pt-4 border-t">
+                      <span className="text-sm font-medium text-foreground">Configurações de Estudo</span>
+                      <div className="grid grid-cols-2 gap-3 text-sm mt-2">
+                        <div>
+                          <span className="text-muted-foreground">Objetivo:</span>
+                          <p>{selectedStudent.objective || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Meta semanal:</span>
+                          <p>{selectedStudent.weeklyGoalHours || 20}h</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Data da prova:</span>
+                          <p>{selectedStudent.examDate || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Revisões:</span>
+                          <p>D{(selectedStudent.reviewIntervals || [1, 7, 30]).join(', D')}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </TabsContent>
 
@@ -311,10 +343,11 @@ const Students = () => {
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <Tabs defaultValue="personal">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="personal">Pessoal</TabsTrigger>
                 <TabsTrigger value="academic">Acadêmico</TabsTrigger>
                 <TabsTrigger value="pedagogical">Pedagógico</TabsTrigger>
+                <TabsTrigger value="config">Configurações</TabsTrigger>
               </TabsList>
 
               <TabsContent value="personal" className="space-y-4 mt-4">
@@ -450,6 +483,68 @@ const Students = () => {
                     onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
                     rows={3}
                   />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="config" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Objetivo</Label>
+                  <Select value={form.objective || 'ENEM'} onValueChange={v => setForm(prev => ({ ...prev, objective: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ENEM">ENEM</SelectItem>
+                      <SelectItem value="Vestibular">Vestibular</SelectItem>
+                      <SelectItem value="Concurso">Concurso Público</SelectItem>
+                      <SelectItem value="Residência">Residência Médica</SelectItem>
+                      <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Meta semanal (horas)</Label>
+                    <Input type="number" min="1" max="80" value={form.weeklyGoalHours || 20} onChange={e => setForm(prev => ({ ...prev, weeklyGoalHours: parseInt(e.target.value) || 20 }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data da prova</Label>
+                    <Input type="date" value={form.examDate || ''} onChange={e => setForm(prev => ({ ...prev, examDate: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Disponibilidade (horas/dia)</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {Object.entries({ seg: 'Segunda', ter: 'Terça', qua: 'Quarta', qui: 'Quinta', sex: 'Sexta', sab: 'Sábado', dom: 'Domingo' }).map(([key, label]) => (
+                      <div key={key} className="space-y-1">
+                        <Label className="text-xs">{label}</Label>
+                        <Input
+                          type="number" min="0" max="12" step="0.5"
+                          value={form.availability?.[key] || 0}
+                          onChange={e => setForm(prev => ({ ...prev, availability: { ...prev.availability, [key]: Math.max(0, Math.min(12, parseFloat(e.target.value) || 0)) } }))}
+                          className="h-9"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Intervalos de Revisão (dias)</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(form.reviewIntervals || [1, 7, 30]).map((interval, idx) => (
+                      <div key={idx} className="space-y-1">
+                        <Label className="text-xs">Revisão {idx + 1}</Label>
+                        <Input
+                          type="number" min="1"
+                          value={interval}
+                          onChange={e => {
+                            const newIntervals = [...(form.reviewIntervals || [1, 7, 30])];
+                            newIntervals[idx] = parseInt(e.target.value) || 1;
+                            setForm(prev => ({ ...prev, reviewIntervals: newIntervals }));
+                          }}
+                          className="h-9"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
