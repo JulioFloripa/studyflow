@@ -51,6 +51,11 @@ interface EducationalContextType {
   initializeTimeGrid: (studentId: string) => Promise<void>;
   copyClassTemplatesToStudent: (studentId: string, classId: string) => Promise<void>;
   
+  // Cycles
+  saveCycle: (studentId: string, cycleData: any, weeklyHours: number, totalSessions: number) => Promise<void>;
+  loadActiveCycle: (studentId: string) => Promise<any | null>;
+  loadCycleHistory: (studentId: string) => Promise<any[]>;
+  
   // Refresh
   refreshData: () => Promise<void>;
 }
@@ -715,6 +720,52 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
     await loadTimeGrid(studentId);
   }, [loadTimeGrid]);
 
+  // Cycles
+  const saveCycle = useCallback(async (studentId: string, cycleData: any, weeklyHours: number, totalSessions: number) => {
+    if (!user) return;
+    await (supabase as any).from('student_cycles').insert({
+      student_id: studentId,
+      coordinator_id: user.id,
+      cycle_data: cycleData,
+      weekly_hours: weeklyHours,
+      total_sessions: totalSessions,
+    });
+  }, [user]);
+
+  const loadActiveCycle = useCallback(async (studentId: string) => {
+    const { data } = await (supabase as any)
+      .from('student_cycles')
+      .select('*')
+      .eq('student_id', studentId)
+      .eq('is_active', true)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (data) {
+      return { cycleData: data.cycle_data, generatedAt: data.generated_at, id: data.id };
+    }
+    return null;
+  }, []);
+
+  const loadCycleHistory = useCallback(async (studentId: string) => {
+    const { data } = await (supabase as any)
+      .from('student_cycles')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('generated_at', { ascending: false })
+      .limit(20);
+    
+    return (data || []).map((c: any) => ({
+      id: c.id,
+      cycleData: c.cycle_data,
+      weeklyHours: c.weekly_hours,
+      totalSessions: c.total_sessions,
+      isActive: c.is_active,
+      generatedAt: c.generated_at,
+    }));
+  }, []);
+
   return (
     <EducationalContext.Provider
       value={{
@@ -751,6 +802,9 @@ export const EducationalProvider: React.FC<{ children: React.ReactNode }> = ({ c
         bulkUpdateTimeSlots,
         initializeTimeGrid,
         copyClassTemplatesToStudent,
+        saveCycle,
+        loadActiveCycle,
+        loadCycleHistory,
         refreshData,
       }}
     >

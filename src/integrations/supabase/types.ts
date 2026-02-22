@@ -264,6 +264,50 @@ export type Database = {
         }
         Relationships: []
       }
+      student_cycles: {
+        Row: {
+          coordinator_id: string
+          created_at: string
+          cycle_data: Json
+          generated_at: string
+          id: string
+          is_active: boolean
+          student_id: string
+          total_sessions: number
+          weekly_hours: number
+        }
+        Insert: {
+          coordinator_id: string
+          created_at?: string
+          cycle_data: Json
+          generated_at?: string
+          id?: string
+          is_active?: boolean
+          student_id: string
+          total_sessions?: number
+          weekly_hours?: number
+        }
+        Update: {
+          coordinator_id?: string
+          created_at?: string
+          cycle_data?: Json
+          generated_at?: string
+          id?: string
+          is_active?: boolean
+          student_id?: string
+          total_sessions?: number
+          weekly_hours?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_cycles_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           academic_history: Json | null

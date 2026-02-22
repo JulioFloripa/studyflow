@@ -248,10 +248,11 @@ const Recommendations: React.FC<RecommendationsProps> = ({ recommendations }) =>
 // --- Main Page ---
 
 const StudentDashboard = () => {
-  const { students, selectedStudent, selectStudent, timeSlots, scheduleSubjects } = useEducational();
+  const { students, selectedStudent, selectStudent, timeSlots, scheduleSubjects, saveCycle, loadActiveCycle } = useEducational();
   const { subjects, topics } = useStudy();
   const [cycle, setCycle] = useState<StudyCycleResult | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [loadingCycle, setLoadingCycle] = useState(false);
 
   // Auto-select single student
   useEffect(() => {
@@ -259,6 +260,18 @@ const StudentDashboard = () => {
       selectStudent(students[0]);
     }
   }, [students, selectedStudent, selectStudent]);
+
+  // Carregar ciclo ativo do banco
+  useEffect(() => {
+    if (!selectedStudent) return;
+    setLoadingCycle(true);
+    loadActiveCycle(selectedStudent.id).then(saved => {
+      if (saved?.cycleData) {
+        setCycle(saved.cycleData as StudyCycleResult);
+      }
+      setLoadingCycle(false);
+    });
+  }, [selectedStudent, loadActiveCycle]);
 
   const handleGenerate = async () => {
     if (!selectedStudent) {
@@ -285,7 +298,16 @@ const StudentDashboard = () => {
         selectedStudent, timeSlots, subjects, topicsBySubject, scheduleSubjects
       );
       setCycle(result);
-      toast.success('Ciclo gerado com sucesso!');
+      
+      // Salvar no banco
+      await saveCycle(
+        selectedStudent.id,
+        result,
+        result.weeklyHours,
+        result.slots.length
+      );
+      
+      toast.success('Ciclo gerado e salvo!');
     } catch (err) {
       console.error(err);
       toast.error('Erro ao gerar ciclo');
@@ -353,6 +375,11 @@ const StudentDashboard = () => {
               ? 'Cadastre alunos na página de Alunos primeiro'
               : 'Selecione um aluno acima para visualizar o dashboard'}
           </p>
+        </Card>
+      ) : loadingCycle ? (
+        <Card className="p-12 text-center">
+          <RefreshCw className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Carregando ciclo salvo...</p>
         </Card>
       ) : !cycle ? (
         <Card className="p-12 text-center">
