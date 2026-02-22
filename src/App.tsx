@@ -14,7 +14,7 @@ import RegisterStudy from "@/pages/RegisterStudy";
 import Reviews from "@/pages/Reviews";
 import VerticalSyllabus from "@/pages/VerticalSyllabus";
 import Difficulties from "@/pages/Difficulties";
-import SettingsPage from "@/pages/Settings";
+
 import Gamification from "@/pages/Gamification";
 import Classes from "@/pages/Classes";
 import Students from "@/pages/Students";
@@ -53,7 +53,6 @@ const App = () => (
                 <Route path="/edital" element={<VerticalSyllabus />} />
                 <Route path="/dificuldades" element={<Difficulties />} />
                 <Route path="/conquistas" element={<Gamification />} />
-                <Route path="/configuracoes" element={<SettingsPage />} />
                 <Route path="/turmas" element={<Classes />} />
                 <Route path="/alunos" element={<Students />} />
                 <Route path="/ciclo-aluno" element={<StudentCycle />} />
