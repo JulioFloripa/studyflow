@@ -3,8 +3,9 @@ import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, Al
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useUserRole } from '@/hooks/useUserRole';
 
-const navItems = [
+const studentNavItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/plano', label: 'Plano', icon: BookOpen },
   { path: '/planejamento', label: 'Planejamento', icon: Calendar },
@@ -13,18 +14,25 @@ const navItems = [
   { path: '/edital', label: 'Edital', icon: ListChecks },
   { path: '/dificuldades', label: 'Dificuldades', icon: AlertTriangle },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
+];
+
+const coordinatorNavItems = [
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/turmas', label: 'Turmas', icon: School },
   { path: '/alunos', label: 'Alunos', icon: Users },
   { path: '/ciclo-aluno', label: 'Ciclo do Aluno', icon: CalendarCheck },
   { path: '/dashboard-aluno', label: 'Dashboard Aluno', icon: Target },
+  { path: '/registrar', label: 'Registrar Estudo', icon: PenLine },
 ];
-
-const mobileMainItems = navItems.slice(0, 4);
-const mobileMoreItems = navItems.slice(4);
 
 const Layout = () => {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { role, loading: roleLoading } = useUserRole();
+
+  const navItems = role === 'student' ? studentNavItems : coordinatorNavItems;
+  const mobileMainItems = navItems.slice(0, 4);
+  const mobileMoreItems = navItems.slice(4);
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -41,7 +49,9 @@ const Layout = () => {
           </div>
           <div>
             <h1 className="text-lg font-bold text-foreground leading-tight">StudyFlow</h1>
-            <p className="text-[11px] text-muted-foreground leading-none">Controle de Estudos</p>
+            <p className="text-[11px] text-muted-foreground leading-none">
+              {role === 'student' ? 'Área do Aluno' : 'Área do Coordenador'}
+            </p>
           </div>
         </div>
 
@@ -96,43 +106,45 @@ const Layout = () => {
             );
           })}
 
-          <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-            <SheetTrigger asChild>
-              <button
-                className={cn(
-                  'flex flex-col items-center gap-0.5 py-2 px-3 min-w-0 text-[10px] font-medium transition-colors',
-                  mobileMoreItems.some(i => isActive(i.path)) ? 'text-primary' : 'text-muted-foreground'
-                )}
-              >
-                <Menu className="h-5 w-5" />
-                <span>Mais</span>
-              </button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl">
-              <div className="grid grid-cols-2 gap-2 py-2">
-                {mobileMoreItems.map(item => {
-                  const Icon = item.icon;
-                  const active = isActive(item.path);
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setMoreOpen(false)}
-                      className={cn(
-                        'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all',
-                        active
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-foreground hover:bg-secondary'
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </SheetContent>
-          </Sheet>
+          {mobileMoreItems.length > 0 && (
+            <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+              <SheetTrigger asChild>
+                <button
+                  className={cn(
+                    'flex flex-col items-center gap-0.5 py-2 px-3 min-w-0 text-[10px] font-medium transition-colors',
+                    mobileMoreItems.some(i => isActive(i.path)) ? 'text-primary' : 'text-muted-foreground'
+                  )}
+                >
+                  <Menu className="h-5 w-5" />
+                  <span>Mais</span>
+                </button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-2xl">
+                <div className="grid grid-cols-2 gap-2 py-2">
+                  {mobileMoreItems.map(item => {
+                    const Icon = item.icon;
+                    const active = isActive(item.path);
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setMoreOpen(false)}
+                        className={cn(
+                          'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all',
+                          active
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground hover:bg-secondary'
+                        )}
+                      >
+                        <Icon className="h-5 w-5" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </nav>
     </div>
