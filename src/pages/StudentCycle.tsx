@@ -13,10 +13,11 @@ import { downloadReportPDF } from '@/lib/pdfGenerator';
 import type { StudyCycleResult } from '@/lib/cycleGeneratorV2';
 
 const StudentCycle = () => {
-  const { students, selectedStudent, selectStudent, timeSlots, scheduleSubjects } = useEducational();
+  const { students, selectedStudent, selectStudent, timeSlots, scheduleSubjects, saveCycle, loadActiveCycle } = useEducational();
   const { subjects, topics } = useStudy();
   const [cycle, setCycle] = useState<StudyCycleResult | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [loadingCycle, setLoadingCycle] = useState(false);
 
   // Auto-selecionar se há apenas um aluno
   useEffect(() => {
@@ -24,6 +25,18 @@ const StudentCycle = () => {
       selectStudent(students[0]);
     }
   }, [students, selectedStudent, selectStudent]);
+
+  // Carregar ciclo ativo do banco
+  useEffect(() => {
+    if (!selectedStudent) return;
+    setLoadingCycle(true);
+    loadActiveCycle(selectedStudent.id).then(saved => {
+      if (saved?.cycleData) {
+        setCycle(saved.cycleData as StudyCycleResult);
+      }
+      setLoadingCycle(false);
+    });
+  }, [selectedStudent, loadActiveCycle]);
 
   const handleGenerateCycle = async () => {
     if (!selectedStudent) {
@@ -60,7 +73,16 @@ const StudentCycle = () => {
       );
 
       setCycle(generatedCycle);
-      toast.success('Ciclo de estudos gerado com sucesso!');
+      
+      // Salvar no banco
+      await saveCycle(
+        selectedStudent.id,
+        generatedCycle,
+        generatedCycle.weeklyHours,
+        generatedCycle.slots.length
+      );
+      
+      toast.success('Ciclo de estudos gerado e salvo com sucesso!');
     } catch (error) {
       console.error(error);
       toast.error('Erro ao gerar ciclo de estudos');
@@ -122,7 +144,7 @@ const StudentCycle = () => {
               const student = students.find(s => s.id === value);
               if (student) {
                 selectStudent(student);
-                setCycle(null);
+                setCycle(null); // Will be reloaded by useEffect
               }
             }}
           >
@@ -148,6 +170,11 @@ const StudentCycle = () => {
               ? 'Cadastre alunos na página de Alunos primeiro'
               : 'Selecione um aluno acima para gerar o ciclo'}
           </p>
+        </Card>
+      ) : loadingCycle ? (
+        <Card className="p-12 text-center">
+          <RefreshCw className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-spin" />
+          <p className="text-muted-foreground">Carregando ciclo salvo...</p>
         </Card>
       ) : !cycle ? (
         <Card className="p-12 text-center">
