@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useStudy } from '@/contexts/StudyContext';
+import { useEducational } from '@/contexts/EducationalContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +13,10 @@ import { toast } from 'sonner';
 
 const RegisterStudy = () => {
   const { subjects, topics, addStudySession } = useStudy();
+  const { students } = useEducational();
+  const { isCoordinator } = useUserRole();
+  
+  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
   const [minutes, setMinutes] = useState('');
@@ -27,6 +33,11 @@ const RegisterStudy = () => {
     e.preventDefault();
     if (!subjectId || !topicId || !minutes) {
       toast.error('Preencha disciplina, assunto e tempo.');
+      return;
+    }
+
+    if (isCoordinator && !selectedStudentId) {
+      toast.error('Selecione um aluno.');
       return;
     }
 
@@ -64,7 +75,9 @@ const RegisterStudy = () => {
         <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
           <PenLine className="h-7 w-7 text-primary" /> Registrar Estudo
         </h1>
-        <p className="text-muted-foreground mt-1">Registre sua sessão de estudo do dia</p>
+        <p className="text-muted-foreground mt-1">
+          {isCoordinator ? 'Registre uma sessão de estudo para um aluno' : 'Registre sua sessão de estudo do dia'}
+        </p>
       </div>
 
       {saved ? (
@@ -76,6 +89,20 @@ const RegisterStudy = () => {
       ) : (
         <Card className="p-5 md:p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {isCoordinator && (
+              <div className="space-y-2">
+                <Label>Aluno *</Label>
+                <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
+                  <SelectContent>
+                    {students.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.fullName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Disciplina *</Label>

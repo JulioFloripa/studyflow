@@ -7,14 +7,14 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { StudyProvider } from "@/contexts/StudyContext";
 import { EducationalProvider } from "@/contexts/EducationalContext";
 import Layout from "@/components/Layout";
-import Dashboard from "@/pages/Dashboard";
+import RoleRoute from "@/components/RoleRoute";
+import DashboardRouter from "@/pages/DashboardRouter";
 import StudyPlan from "@/pages/StudyPlan";
 import Planning from "@/pages/Planning";
 import RegisterStudy from "@/pages/RegisterStudy";
 import Reviews from "@/pages/Reviews";
 import VerticalSyllabus from "@/pages/VerticalSyllabus";
 import Difficulties from "@/pages/Difficulties";
-
 import Gamification from "@/pages/Gamification";
 import Classes from "@/pages/Classes";
 import Students from "@/pages/Students";
@@ -45,18 +45,24 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Auth />} />
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/plano" element={<StudyPlan />} />
-                <Route path="/planejamento" element={<Planning />} />
+                <Route path="/" element={<DashboardRouter />} />
+                
+                {/* Student-only routes */}
+                <Route path="/plano" element={<RoleRoute allowedRoles={['student']}><StudyPlan /></RoleRoute>} />
+                <Route path="/planejamento" element={<RoleRoute allowedRoles={['student']}><Planning /></RoleRoute>} />
+                <Route path="/revisoes" element={<RoleRoute allowedRoles={['student']}><Reviews /></RoleRoute>} />
+                <Route path="/edital" element={<RoleRoute allowedRoles={['student']}><VerticalSyllabus /></RoleRoute>} />
+                <Route path="/dificuldades" element={<RoleRoute allowedRoles={['student']}><Difficulties /></RoleRoute>} />
+                <Route path="/conquistas" element={<RoleRoute allowedRoles={['student']}><Gamification /></RoleRoute>} />
+                
+                {/* Coordinator-only routes */}
+                <Route path="/turmas" element={<RoleRoute allowedRoles={['coordinator']}><Classes /></RoleRoute>} />
+                <Route path="/alunos" element={<RoleRoute allowedRoles={['coordinator']}><Students /></RoleRoute>} />
+                <Route path="/ciclo-aluno" element={<RoleRoute allowedRoles={['coordinator']}><StudentCycle /></RoleRoute>} />
+                <Route path="/dashboard-aluno" element={<RoleRoute allowedRoles={['coordinator']}><StudentDashboard /></RoleRoute>} />
+                
+                {/* Shared routes */}
                 <Route path="/registrar" element={<RegisterStudy />} />
-                <Route path="/revisoes" element={<Reviews />} />
-                <Route path="/edital" element={<VerticalSyllabus />} />
-                <Route path="/dificuldades" element={<Difficulties />} />
-                <Route path="/conquistas" element={<Gamification />} />
-                <Route path="/turmas" element={<Classes />} />
-                <Route path="/alunos" element={<Students />} />
-                <Route path="/ciclo-aluno" element={<StudentCycle />} />
-                <Route path="/dashboard-aluno" element={<StudentDashboard />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
