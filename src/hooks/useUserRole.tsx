@@ -1,17 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export type AppRole = 'coordinator' | 'student';
 
+// Global override for testing
+let roleOverride: AppRole | null = null;
+const listeners = new Set<() => void>();
+
 export const useUserRole = () => {
   const { user } = useAuth();
-  const [role, setRole] = useState<AppRole | null>(null);
+  const [dbRole, setDbRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [, forceUpdate] = useState(0);
+
+  // Listen for override changes
+  useEffect(() => {
+    const listener = () => forceUpdate(n => n + 1);
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }, []);
 
   useEffect(() => {
     if (!user) {
-      setRole(null);
+      setDbRole(null);
       setLoading(false);
       return;
     }
@@ -26,10 +38,9 @@ export const useUserRole = () => {
         .maybeSingle();
 
       if (!error && data) {
-        setRole(data.role as AppRole);
+        setDbRole(data.role as AppRole);
       } else {
-        // Default to coordinator if no role found
-        setRole('coordinator');
+        setDbRole('coordinator');
       }
       setLoading(false);
     };
@@ -37,8 +48,16 @@ export const useUserRole = () => {
     fetchRole();
   }, [user?.id]);
 
+  const role = roleOverride || dbRole;
   const isCoordinator = role === 'coordinator';
   const isStudent = role === 'student';
 
-  return { role, loading, isCoordinator, isStudent };
+  const setRoleOverride = useCallback((newRole: AppRole | null) => {
+    roleOverride = newRole;
+    listeners.forEach(fn => fn());
+  }, []);
+
+  const isOverridden = roleOverride !== null;
+
+  return { role, loading, isCoordinator, isStudent, setRoleOverride, isOverridden, dbRole };
 };
