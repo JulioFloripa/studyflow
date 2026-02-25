@@ -21,6 +21,7 @@ import Students from "@/pages/Students";
 import StudentCycle from "@/pages/StudentCycle";
 import StudentDashboard from "@/pages/StudentDashboard";
 import Auth from "@/pages/Auth";
+import EditaisRouter from "@/pages/EditaisRouter";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -63,6 +64,7 @@ const App = () => (
                 
                 {/* Shared routes */}
                 <Route path="/registrar" element={<RegisterStudy />} />
+                <Route path="/editais" element={<EditaisRouter />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
