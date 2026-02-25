@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { useEducational } from '@/contexts/EducationalContext';
 import { useStudy } from '@/contexts/StudyContext';
 import { Card } from '@/components/ui/card';
@@ -15,6 +16,7 @@ import { generateSmartCycleV2, formatCycleForWeek } from '@/lib/cycleGeneratorV2
 import { DAY_LABELS, DAY_LABELS_SHORT } from '@/types/educational';
 import { downloadReportPDF } from '@/lib/pdfGenerator';
 import type { StudyCycleResult, CycleSlot } from '@/lib/cycleGeneratorV2';
+import { fetchSyllabusWeekTopics, fetchDifficultyTopics } from '@/lib/cycleDataFetchers';
 
 // --- Sub-components ---
 
@@ -250,6 +252,7 @@ const Recommendations: React.FC<RecommendationsProps> = ({ recommendations }) =>
 const StudentDashboard = () => {
   const { students, selectedStudent, selectStudent, timeSlots, scheduleSubjects, saveCycle, loadActiveCycle } = useEducational();
   const { subjects, topics } = useStudy();
+  const { user } = useAuth();
   const [cycle, setCycle] = useState<StudyCycleResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [loadingCycle, setLoadingCycle] = useState(false);
@@ -290,12 +293,21 @@ const StudentDashboard = () => {
     setGenerating(true);
     try {
       const topicsBySubject: Record<string, string[]> = {};
+      const subjectNameMap: Record<string, string> = {};
       subjects.forEach(sub => {
         topicsBySubject[sub.id] = topics.filter(t => t.subjectId === sub.id).map(t => t.name);
+        subjectNameMap[sub.id] = sub.name;
       });
 
+      const schedSubjectIds = scheduleSubjects.map(s => s.id);
+      const [syllabusWeekTopics, difficultyTopics] = await Promise.all([
+        fetchSyllabusWeekTopics(schedSubjectIds),
+        user ? fetchDifficultyTopics(user.id, subjectNameMap) : Promise.resolve([]),
+      ]);
+
       const result = generateSmartCycleV2(
-        selectedStudent, timeSlots, subjects, topicsBySubject, scheduleSubjects
+        selectedStudent, timeSlots, subjects, topicsBySubject, scheduleSubjects,
+        syllabusWeekTopics, difficultyTopics
       );
       setCycle(result);
       
