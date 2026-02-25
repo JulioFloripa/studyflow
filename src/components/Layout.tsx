@@ -1,9 +1,11 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, GraduationCap, Users, School, CalendarCheck, Target, FileText } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, GraduationCap, Users, School, CalendarCheck, Target, FileText, ArrowLeftRight } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useUserRole } from '@/hooks/useUserRole';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 const studentNavItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,7 +32,15 @@ const coordinatorNavItems = [
 const Layout = () => {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
-  const { role, loading: roleLoading } = useUserRole();
+  const { role, loading: roleLoading, setRoleOverride, isOverridden, dbRole } = useUserRole();
+
+  const handleToggleRole = () => {
+    if (isOverridden) {
+      setRoleOverride(null);
+    } else {
+      setRoleOverride(role === 'coordinator' ? 'student' : 'coordinator');
+    }
+  };
 
   const navItems = role === 'student' ? studentNavItems : coordinatorNavItems;
   const mobileMainItems = navItems.slice(0, 4);
@@ -78,6 +88,24 @@ const Layout = () => {
             );
           })}
         </nav>
+
+        {/* Role switcher */}
+        <div className="px-3 py-3 border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 text-xs"
+            onClick={handleToggleRole}
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            {isOverridden ? 'Voltar ao perfil real' : `Ver como ${role === 'coordinator' ? 'Aluno' : 'Coordenador'}`}
+          </Button>
+          {isOverridden && (
+            <Badge variant="destructive" className="w-full justify-center mt-2 text-xs">
+              Modo de visualização: {role === 'student' ? 'Aluno' : 'Coordenador'}
+            </Badge>
+          )}
+        </div>
       </aside>
 
       {/* Main Content */}
