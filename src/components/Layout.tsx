@@ -1,5 +1,5 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, GraduationCap, Users, School, CalendarCheck, Target } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, GraduationCap, Users, School, CalendarCheck, Target, FileText } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -11,7 +11,8 @@ const studentNavItems = [
   { path: '/planejamento', label: 'Planejamento', icon: Calendar },
   { path: '/registrar', label: 'Registrar', icon: PenLine },
   { path: '/revisoes', label: 'Revisões', icon: RotateCcw },
-  { path: '/edital', label: 'Edital', icon: ListChecks },
+  { path: '/editais', label: 'Editais', icon: FileText },
+  { path: '/edital', label: 'Edital Vertical', icon: ListChecks },
   { path: '/dificuldades', label: 'Dificuldades', icon: AlertTriangle },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
 ];
@@ -20,6 +21,7 @@ const coordinatorNavItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/turmas', label: 'Turmas', icon: School },
   { path: '/alunos', label: 'Alunos', icon: Users },
+  { path: '/editais', label: 'Editais', icon: FileText },
   { path: '/ciclo-aluno', label: 'Ciclo do Aluno', icon: CalendarCheck },
   { path: '/dashboard-aluno', label: 'Dashboard Aluno', icon: Target },
   { path: '/registrar', label: 'Registrar Estudo', icon: PenLine },

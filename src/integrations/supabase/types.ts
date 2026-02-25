@@ -104,6 +104,114 @@ export type Database = {
         }
         Relationships: []
       }
+      editais: {
+        Row: {
+          class_id: string | null
+          coordinator_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          class_id?: string | null
+          coordinator_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          class_id?: string | null
+          coordinator_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editais_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      edital_subjects: {
+        Row: {
+          color: string | null
+          created_at: string
+          edital_id: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          edital_id: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          edital_id?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edital_subjects_edital_id_fkey"
+            columns: ["edital_id"]
+            isOneToOne: false
+            referencedRelation: "editais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      edital_topics: {
+        Row: {
+          created_at: string
+          edital_subject_id: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          edital_subject_id: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          edital_subject_id?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edital_topics_edital_subject_id_fkey"
+            columns: ["edital_subject_id"]
+            isOneToOne: false
+            referencedRelation: "edital_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       imported_presets: {
         Row: {
           id: string
@@ -304,6 +412,41 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_edital_selections: {
+        Row: {
+          edital_id: string
+          id: string
+          last_synced_at: string
+          selected_at: string
+          synced_version: number
+          user_id: string
+        }
+        Insert: {
+          edital_id: string
+          id?: string
+          last_synced_at?: string
+          selected_at?: string
+          synced_version?: number
+          user_id: string
+        }
+        Update: {
+          edital_id?: string
+          id?: string
+          last_synced_at?: string
+          selected_at?: string
+          synced_version?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_edital_selections_edital_id_fkey"
+            columns: ["edital_id"]
+            isOneToOne: false
+            referencedRelation: "editais"
             referencedColumns: ["id"]
           },
         ]
