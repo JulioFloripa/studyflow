@@ -1,4 +1,4 @@
-import { TimeSlot, Student, ScheduleSubject } from '@/types/educational';
+import { TimeSlot, Student, ScheduleSubject, SyllabusItem } from '@/types/educational';
 import { Subject } from '@/types/study';
 
 export interface CycleSlot {
@@ -9,8 +9,15 @@ export interface CycleSlot {
   subjectName: string;
   duration: number; // minutos
   topics: string[];
-  type: 'immediate_review' | 'deep_study' | 'spaced_review' | 'practice';
+  type: 'immediate_review' | 'syllabus_week' | 'difficulty_review' | 'deep_study' | 'spaced_review' | 'practice';
   linkedToClass?: boolean;
+}
+
+export interface DifficultyTopic {
+  subjectId: string;
+  subjectName: string;
+  topicName: string;
+  accuracy: number; // 0-100
 }
 
 export interface CycleDiagnostic {
@@ -243,7 +250,9 @@ function allocateBalanced(
   subjects: Subject[],
   idealDistribution: Record<string, number>,
   classesByDay: Record<number, ClassSession[]>,
-  topicsBySubject: Record<string, string[]>
+  topicsBySubject: Record<string, string[]>,
+  syllabusWeekTopics: Record<string, string[]>,
+  difficultyTopics: DifficultyTopic[]
 ): CycleSlot[] {
   // Track per-day allocations
   const dayAlloc: Record<number, DayAllocation> = {};
@@ -255,15 +264,32 @@ function allocateBalanced(
   const remaining: Record<string, number> = { ...idealDistribution };
   const subjectNameMap = new Map(subjects.map(s => [s.id, s.name]));
 
+  // Build syllabus subject queue (subjects with planned content this week)
+  const syllabusSubjectIds = Object.keys(syllabusWeekTopics).filter(
+    id => syllabusWeekTopics[id].length > 0
+  );
+
+  // Build difficulty subject queue sorted by worst accuracy first
+  const difficultyBySubject: Record<string, DifficultyTopic[]> = {};
+  difficultyTopics
+    .sort((a, b) => a.accuracy - b.accuracy)
+    .forEach(dt => {
+      if (!difficultyBySubject[dt.subjectId]) difficultyBySubject[dt.subjectId] = [];
+      difficultyBySubject[dt.subjectId].push(dt);
+    });
+
   // Sort free blocks: prefer weekdays first, then by start time
   const sortedBlocks = [...freeBlocks].sort((a, b) => {
-    // Weekdays (1-5) first, then weekend (0, 6)
     const aIsWeekday = a.dayOfWeek >= 1 && a.dayOfWeek <= 5;
     const bIsWeekday = b.dayOfWeek >= 1 && b.dayOfWeek <= 5;
     if (aIsWeekday !== bIsWeekday) return aIsWeekday ? -1 : 1;
     if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
     return a.startTime.localeCompare(b.startTime);
   });
+
+  // Track which syllabus/difficulty subjects have been allocated
+  const syllabusAllocated = new Set<string>();
+  const difficultyAllocated = new Set<string>();
 
   for (const block of sortedBlocks) {
     const da = dayAlloc[block.dayOfWeek];
@@ -279,13 +305,15 @@ function allocateBalanced(
     const dayClasses = classesByDay[block.dayOfWeek] || [];
     for (const cls of dayClasses) {
       if (blockRemaining < MIN_SESSION_MINUTES) break;
-      // Skip if already reviewed
       const alreadyReviewed = da.slots.some(
         s => s.subjectId === cls.subjectId && s.type === 'immediate_review'
       );
       if (alreadyReviewed) continue;
 
       const sessionDur = Math.min(MAX_SESSION_MINUTES, blockRemaining);
+      // Use syllabus week topics if available for this subject
+      const topics = syllabusWeekTopics[cls.subjectId]?.slice(0, 3) 
+        || topicsBySubject[cls.subjectId]?.slice(0, 3) || [];
       da.slots.push({
         dayOfWeek: block.dayOfWeek,
         startTime: currentTime,
@@ -293,7 +321,7 @@ function allocateBalanced(
         subjectId: cls.subjectId,
         subjectName: cls.subjectName,
         duration: sessionDur,
-        topics: topicsBySubject[cls.subjectId]?.slice(0, 3) || [],
+        topics,
         type: 'immediate_review',
         linkedToClass: true,
       });
@@ -304,9 +332,69 @@ function allocateBalanced(
       currentTime = calculateEndTime(currentTime, sessionDur);
     }
 
-    // Phase 2: Balanced allocation of remaining time
+    // Phase 2: Syllabus week topics (content planned for this week)
+    for (const subjectId of syllabusSubjectIds) {
+      if (blockRemaining < MIN_SESSION_MINUTES) break;
+      const sessionsToday = da.subjectSessions[subjectId] || 0;
+      if (sessionsToday >= MAX_SESSIONS_SAME_SUBJECT_PER_DAY) continue;
+      // Avoid consecutive same subject
+      const lastSlot = da.slots[da.slots.length - 1];
+      if (lastSlot?.subjectId === subjectId && syllabusSubjectIds.length > 1) continue;
+
+      const subjectName = subjectNameMap.get(subjectId) || 'Disciplina';
+      const sessionDur = Math.min(MAX_SESSION_MINUTES, blockRemaining);
+      da.slots.push({
+        dayOfWeek: block.dayOfWeek,
+        startTime: currentTime,
+        endTime: calculateEndTime(currentTime, sessionDur),
+        subjectId,
+        subjectName,
+        duration: sessionDur,
+        topics: syllabusWeekTopics[subjectId]?.slice(0, 3) || [],
+        type: 'syllabus_week',
+        linkedToClass: false,
+      });
+      da.totalMinutes += sessionDur;
+      da.subjectSessions[subjectId] = (da.subjectSessions[subjectId] || 0) + 1;
+      remaining[subjectId] = Math.max(0, (remaining[subjectId] || 0) - sessionDur);
+      blockRemaining -= sessionDur;
+      currentTime = calculateEndTime(currentTime, sessionDur);
+      syllabusAllocated.add(subjectId);
+    }
+
+    // Phase 3: Difficulty topics (low performance subjects)
+    const diffSubjectIds = Object.keys(difficultyBySubject);
+    for (const subjectId of diffSubjectIds) {
+      if (blockRemaining < MIN_SESSION_MINUTES) break;
+      const sessionsToday = da.subjectSessions[subjectId] || 0;
+      if (sessionsToday >= MAX_SESSIONS_SAME_SUBJECT_PER_DAY) continue;
+      const lastSlot = da.slots[da.slots.length - 1];
+      if (lastSlot?.subjectId === subjectId && diffSubjectIds.length > 1) continue;
+
+      const diffTopics = difficultyBySubject[subjectId];
+      const subjectName = diffTopics[0]?.subjectName || subjectNameMap.get(subjectId) || 'Disciplina';
+      const sessionDur = Math.min(MAX_SESSION_MINUTES, blockRemaining);
+      da.slots.push({
+        dayOfWeek: block.dayOfWeek,
+        startTime: currentTime,
+        endTime: calculateEndTime(currentTime, sessionDur),
+        subjectId,
+        subjectName,
+        duration: sessionDur,
+        topics: diffTopics.slice(0, 3).map(dt => `${dt.topicName} (${dt.accuracy}%)`),
+        type: 'difficulty_review',
+        linkedToClass: false,
+      });
+      da.totalMinutes += sessionDur;
+      da.subjectSessions[subjectId] = (da.subjectSessions[subjectId] || 0) + 1;
+      remaining[subjectId] = Math.max(0, (remaining[subjectId] || 0) - sessionDur);
+      blockRemaining -= sessionDur;
+      currentTime = calculateEndTime(currentTime, sessionDur);
+      difficultyAllocated.add(subjectId);
+    }
+
+    // Phase 4: Balanced allocation of remaining time
     while (blockRemaining >= MIN_SESSION_MINUTES) {
-      // Pick the subject with the most remaining quota that hasn't exceeded daily limit
       const candidate = pickNextSubject(subjects, remaining, da);
       if (!candidate) break;
 
@@ -542,7 +630,9 @@ export function generateSmartCycleV2(
   timeSlots: TimeSlot[],
   subjects: Subject[],
   topicsBySubject: Record<string, string[]>,
-  scheduleSubjects: ScheduleSubject[] = []
+  scheduleSubjects: ScheduleSubject[] = [],
+  syllabusWeekTopics: Record<string, string[]> = {},
+  difficultyTopics: DifficultyTopic[] = []
 ): StudyCycleResult {
   // 1. Extract class schedule
   const classSchedule = extractClassSchedule(timeSlots, scheduleSubjects);
@@ -563,8 +653,11 @@ export function generateSmartCycleV2(
     classesByDay[cls.dayOfWeek].push(cls);
   });
 
-  // 6. Run balanced allocation
-  const slots = allocateBalanced(freeBlocks, subjects, idealDistribution, classesByDay, topicsBySubject);
+  // 6. Run balanced allocation with syllabus + difficulty priority
+  const slots = allocateBalanced(
+    freeBlocks, subjects, idealDistribution, classesByDay, 
+    topicsBySubject, syllabusWeekTopics, difficultyTopics
+  );
 
   // 7. Compute actual distribution
   const distribution: Record<string, number> = {};

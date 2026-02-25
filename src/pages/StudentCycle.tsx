@@ -11,10 +11,13 @@ import { generateSmartCycleV2, formatCycleForWeek } from '@/lib/cycleGeneratorV2
 import { DAY_LABELS } from '@/types/educational';
 import { downloadReportPDF } from '@/lib/pdfGenerator';
 import type { StudyCycleResult } from '@/lib/cycleGeneratorV2';
+import { fetchSyllabusWeekTopics, fetchDifficultyTopics } from '@/lib/cycleDataFetchers';
+import { useAuth } from '@/hooks/useAuth';
 
 const StudentCycle = () => {
   const { students, selectedStudent, selectStudent, timeSlots, scheduleSubjects, saveCycle, loadActiveCycle } = useEducational();
   const { subjects, topics } = useStudy();
+  const { user } = useAuth();
   const [cycle, setCycle] = useState<StudyCycleResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [loadingCycle, setLoadingCycle] = useState(false);
@@ -58,18 +61,29 @@ const StudentCycle = () => {
     try {
       // Organizar tópicos por disciplina
       const topicsBySubject: Record<string, string[]> = {};
+      const subjectNameMap: Record<string, string> = {};
       subjects.forEach(subject => {
         topicsBySubject[subject.id] = topics
           .filter(t => t.subjectId === subject.id)
           .map(t => t.name);
+        subjectNameMap[subject.id] = subject.name;
       });
+
+      // Fetch syllabus week topics and difficulty data
+      const schedSubjectIds = scheduleSubjects.map(s => s.id);
+      const [syllabusWeekTopics, difficultyTopics] = await Promise.all([
+        fetchSyllabusWeekTopics(schedSubjectIds),
+        user ? fetchDifficultyTopics(user.id, subjectNameMap) : Promise.resolve([]),
+      ]);
 
       const generatedCycle = generateSmartCycleV2(
         selectedStudent,
         timeSlots,
         subjects,
         topicsBySubject,
-        scheduleSubjects
+        scheduleSubjects,
+        syllabusWeekTopics,
+        difficultyTopics
       );
 
       setCycle(generatedCycle);
@@ -310,9 +324,26 @@ const StudentCycle = () => {
                                 </p>
                               )}
                             </div>
-                            <Badge variant="secondary" className="text-xs">
-                              {slot.duration}min
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              {slot.type === 'syllabus_week' && (
+                                <Badge variant="outline" className="text-xs border-primary text-primary">
+                                  📋 Semana
+                                </Badge>
+                              )}
+                              {slot.type === 'difficulty_review' && (
+                                <Badge variant="outline" className="text-xs border-destructive text-destructive">
+                                  ⚠️ Dificuldade
+                                </Badge>
+                              )}
+                              {slot.type === 'immediate_review' && (
+                                <Badge variant="outline" className="text-xs border-accent-foreground">
+                                  🎯 Revisão
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="text-xs">
+                                {slot.duration}min
+                              </Badge>
+                            </div>
                           </div>
                         );
                       })}
