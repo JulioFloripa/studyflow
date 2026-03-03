@@ -11,7 +11,7 @@ import { generateSmartCycleV2, formatCycleForWeek } from '@/lib/cycleGeneratorV2
 import { DAY_LABELS } from '@/types/educational';
 import { downloadReportPDF } from '@/lib/pdfGenerator';
 import type { StudyCycleResult } from '@/lib/cycleGeneratorV2';
-import { fetchSyllabusWeekTopics, fetchDifficultyTopics } from '@/lib/cycleDataFetchers';
+import { fetchSyllabusWeekTopics, fetchDifficultyTopics, fetchEditalTopicsForCycle } from '@/lib/cycleDataFetchers';
 import { useAuth } from '@/hooks/useAuth';
 
 const StudentCycle = () => {
@@ -62,19 +62,53 @@ const StudentCycle = () => {
       // Organizar tópicos por disciplina
       const topicsBySubject: Record<string, string[]> = {};
       const subjectNameMap: Record<string, string> = {};
+      const subjectNameToId: Record<string, string> = {}; // lowercase name -> id
       subjects.forEach(subject => {
         topicsBySubject[subject.id] = topics
           .filter(t => t.subjectId === subject.id)
           .map(t => t.name);
         subjectNameMap[subject.id] = subject.name;
+        subjectNameToId[subject.name.toLowerCase().trim()] = subject.id;
       });
 
-      // Fetch syllabus week topics and difficulty data
+      // Fetch syllabus week topics, difficulty data, and edital topics
       const schedSubjectIds = scheduleSubjects.map(s => s.id);
-      const [syllabusWeekTopics, difficultyTopics] = await Promise.all([
+      const [syllabusWeekTopics, difficultyTopics, editalTopics] = await Promise.all([
         fetchSyllabusWeekTopics(schedSubjectIds),
         user ? fetchDifficultyTopics(user.id, subjectNameMap) : Promise.resolve([]),
+        user ? fetchEditalTopicsForCycle(user.id, subjectNameToId) : Promise.resolve({}),
       ]);
+
+      // Merge edital topics into topicsBySubject (avoid duplicates)
+      Object.entries(editalTopics).forEach(([subjectId, editalTopicNames]) => {
+        if (!topicsBySubject[subjectId]) topicsBySubject[subjectId] = [];
+        const existing = new Set(topicsBySubject[subjectId].map(t => t.toLowerCase()));
+        (editalTopicNames as string[]).forEach(name => {
+          if (!existing.has(name.toLowerCase())) {
+            topicsBySubject[subjectId].push(name);
+            existing.add(name.toLowerCase());
+          }
+        });
+      });
+
+      // If no syllabus week topics but we have edital topics, use edital as syllabus content
+      const effectiveSyllabusWeekTopics = { ...syllabusWeekTopics };
+      if (Object.keys(effectiveSyllabusWeekTopics).length === 0 && Object.keys(editalTopics).length > 0) {
+        // Map edital topics to schedule_subject IDs by name matching
+        const schedSubjectNameToId: Record<string, string> = {};
+        scheduleSubjects.forEach(ss => {
+          schedSubjectNameToId[ss.name.toLowerCase().trim()] = ss.id;
+        });
+        Object.entries(editalTopics).forEach(([subjectId, topicNames]) => {
+          const subjectName = subjectNameMap[subjectId];
+          if (subjectName) {
+            const schedId = schedSubjectNameToId[subjectName.toLowerCase().trim()];
+            if (schedId && !effectiveSyllabusWeekTopics[schedId]) {
+              effectiveSyllabusWeekTopics[schedId] = (topicNames as string[]).slice(0, 5);
+            }
+          }
+        });
+      }
 
       const generatedCycle = generateSmartCycleV2(
         selectedStudent,
@@ -82,7 +116,7 @@ const StudentCycle = () => {
         subjects,
         topicsBySubject,
         scheduleSubjects,
-        syllabusWeekTopics,
+        effectiveSyllabusWeekTopics,
         difficultyTopics
       );
 
