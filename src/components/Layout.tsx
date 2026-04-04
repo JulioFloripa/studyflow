@@ -1,15 +1,16 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, GraduationCap, Users, School, CalendarCheck, Target, FileText, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, Users, School, CalendarCheck, Target, FileText, ArrowLeftRight, LogOut } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 const studentNavItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/plano', label: 'Plano', icon: BookOpen },
+  { path: '/plano', label: 'Plano de Estudos', icon: BookOpen },
   { path: '/planejamento', label: 'Planejamento', icon: Calendar },
   { path: '/registrar', label: 'Registrar', icon: PenLine },
   { path: '/revisoes', label: 'Revisões', icon: RotateCcw },
@@ -32,7 +33,8 @@ const coordinatorNavItems = [
 const Layout = () => {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
-  const { role, loading: roleLoading, setRoleOverride, isOverridden, dbRole } = useUserRole();
+  const { role, setRoleOverride, isOverridden } = useUserRole();
+  const { signOut } = useAuth();
 
   const handleToggleRole = () => {
     if (isOverridden) {
@@ -52,22 +54,30 @@ const Layout = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'hsl(222 47% 6%)' }}>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
-        <div className="flex items-center gap-2.5 px-5 py-5 border-b border-border">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary">
-            <GraduationCap className="h-5 w-5 text-primary-foreground" />
+      <aside
+        className="hidden md:flex w-60 flex-col"
+        style={{ background: 'hsl(222 47% 7%)', borderRight: '1px solid hsl(222 47% 14%)' }}
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 px-5 py-5" style={{ borderBottom: '1px solid hsl(222 47% 14%)' }}>
+          <div
+            className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))', boxShadow: '0 0 12px hsl(217 91% 60% / 0.3)' }}
+          >
+            <BookOpen className="h-4.5 w-4.5 text-white" style={{ width: '18px', height: '18px' }} />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground leading-tight">StudyFlow</h1>
-            <p className="text-[11px] text-muted-foreground leading-none">
+            <h1 className="text-base font-bold text-white leading-tight">StudyFlow</h1>
+            <p className="text-[10px] leading-none" style={{ color: 'hsl(215 20% 45%)' }}>
               {role === 'student' ? 'Área do Aluno' : 'Área do Coordenador'}
             </p>
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin">
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-thin">
           {navItems.map(item => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -76,47 +86,75 @@ const Layout = () => {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                  active
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                 )}
+                style={{
+                  background: active ? 'hsl(217 91% 60% / 0.15)' : 'transparent',
+                  color: active ? 'hsl(217 91% 70%)' : 'hsl(215 20% 55%)',
+                  borderLeft: active ? '2px solid hsl(217 91% 60%)' : '2px solid transparent',
+                }}
+                onMouseEnter={e => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.background = 'hsl(222 47% 12%)';
+                    (e.currentTarget as HTMLElement).style.color = 'hsl(210 40% 85%)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLElement).style.color = 'hsl(215 20% 55%)';
+                  }
+                }}
               >
-                <Icon className="h-[18px] w-[18px] flex-shrink-0" />
+                <Icon className="h-[17px] w-[17px] flex-shrink-0" />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        {/* Role switcher */}
-        <div className="px-3 py-3 border-t border-border">
+        {/* Footer */}
+        <div className="px-3 py-3 space-y-2" style={{ borderTop: '1px solid hsl(222 47% 14%)' }}>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="w-full justify-start gap-2 text-xs"
+            className="w-full justify-start gap-2 text-xs h-8"
             onClick={handleToggleRole}
+            style={{ color: 'hsl(215 20% 50%)', background: 'transparent' }}
           >
             <ArrowLeftRight className="h-3.5 w-3.5" />
             {isOverridden ? 'Voltar ao perfil real' : `Ver como ${role === 'coordinator' ? 'Aluno' : 'Coordenador'}`}
           </Button>
           {isOverridden && (
-            <Badge variant="destructive" className="w-full justify-center mt-2 text-xs">
-              Modo de visualização: {role === 'student' ? 'Aluno' : 'Coordenador'}
+            <Badge className="w-full justify-center text-xs" style={{ background: 'hsl(0 72% 51% / 0.15)', color: 'hsl(0 72% 65%)', border: '1px solid hsl(0 72% 51% / 0.3)' }}>
+              Modo: {role === 'student' ? 'Aluno' : 'Coordenador'}
             </Badge>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-xs h-8"
+            onClick={() => signOut()}
+            style={{ color: 'hsl(215 20% 40%)', background: 'transparent' }}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sair
+          </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+      <main className="flex-1 overflow-y-auto pb-20 md:pb-0 scrollbar-thin">
         <div className="animate-fade-in">
           <Outlet />
         </div>
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-card border-t border-border z-50">
+      <nav
+        className="fixed bottom-0 left-0 right-0 md:hidden z-50"
+        style={{ background: 'hsl(222 47% 8%)', borderTop: '1px solid hsl(222 47% 14%)' }}
+      >
         <div className="flex items-center justify-around px-1 pb-[env(safe-area-inset-bottom)]">
           {mobileMainItems.map(item => {
             const Icon = item.icon;
@@ -125,31 +163,30 @@ const Layout = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={cn(
-                  'flex flex-col items-center gap-0.5 py-2 px-3 min-w-0 text-[10px] font-medium transition-colors',
-                  active ? 'text-primary' : 'text-muted-foreground'
-                )}
+                className="flex flex-col items-center gap-0.5 py-2.5 px-3 min-w-0 text-[10px] font-medium transition-colors"
+                style={{ color: active ? 'hsl(217 91% 60%)' : 'hsl(215 20% 45%)' }}
               >
                 <Icon className={cn('h-5 w-5', active && 'stroke-[2.5]')} />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{item.label.split(' ')[0]}</span>
               </Link>
             );
           })}
-
           {mobileMoreItems.length > 0 && (
             <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
               <SheetTrigger asChild>
                 <button
-                  className={cn(
-                    'flex flex-col items-center gap-0.5 py-2 px-3 min-w-0 text-[10px] font-medium transition-colors',
-                    mobileMoreItems.some(i => isActive(i.path)) ? 'text-primary' : 'text-muted-foreground'
-                  )}
+                  className="flex flex-col items-center gap-0.5 py-2.5 px-3 min-w-0 text-[10px] font-medium transition-colors"
+                  style={{ color: mobileMoreItems.some(i => isActive(i.path)) ? 'hsl(217 91% 60%)' : 'hsl(215 20% 45%)' }}
                 >
                   <Menu className="h-5 w-5" />
                   <span>Mais</span>
                 </button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="rounded-t-2xl">
+              <SheetContent
+                side="bottom"
+                className="rounded-t-2xl"
+                style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 16%)' }}
+              >
                 <div className="grid grid-cols-2 gap-2 py-2">
                   {mobileMoreItems.map(item => {
                     const Icon = item.icon;
@@ -159,12 +196,12 @@ const Layout = () => {
                         key={item.path}
                         to={item.path}
                         onClick={() => setMoreOpen(false)}
-                        className={cn(
-                          'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all',
-                          active
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-foreground hover:bg-secondary'
-                        )}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: active ? 'hsl(217 91% 60% / 0.15)' : 'hsl(222 47% 12%)',
+                          color: active ? 'hsl(217 91% 70%)' : 'hsl(215 20% 65%)',
+                          border: active ? '1px solid hsl(217 91% 60% / 0.3)' : '1px solid hsl(222 47% 18%)',
+                        }}
                       >
                         <Icon className="h-5 w-5" />
                         {item.label}
