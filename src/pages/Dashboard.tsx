@@ -7,6 +7,7 @@ import { Clock, Target, Flame, TrendingUp, AlertTriangle, RotateCcw } from 'luci
 import { startOfWeek, addDays, format } from 'date-fns';
 import { NextActionCard } from '@/components/NextActionCard';
 import { GamificationCard } from '@/components/GamificationCard';
+import { DailyPlan } from '@/components/DailyPlan';
 import { getTopSuggestion } from '@/lib/suggestions';
 import { getUserStats, checkUnlockedBadges } from '@/lib/gamification';
 
@@ -108,9 +109,16 @@ const Dashboard = () => {
         <p className="text-muted-foreground mt-1">Acompanhe seu progresso de estudos</p>
       </div>
 
-      {/* Next Action + Gamification */}
+      {/* Daily Plan + Next Action + Gamification */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
+          <DailyPlan
+            subjects={subjects}
+            topics={topics}
+            studySessions={studySessions}
+            dailyHours={((userProfile as any).onboardingData?.dailyHours) || '1to2'}
+            studyDays={((userProfile as any).onboardingData?.studyDays) || ['seg', 'ter', 'qua', 'qui', 'sex']}
+          />
           <NextActionCard suggestion={topSuggestion} loading={loading} />
         </div>
         <div>

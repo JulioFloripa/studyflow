@@ -1,50 +1,28 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, Users, School, CalendarCheck, Target, FileText, ArrowLeftRight, LogOut } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, FileText, LogOut } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
-const studentNavItems = [
+const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/plano', label: 'Plano de Estudos', icon: BookOpen },
   { path: '/planejamento', label: 'Planejamento', icon: Calendar },
   { path: '/registrar', label: 'Registrar', icon: PenLine },
   { path: '/revisoes', label: 'Revisões', icon: RotateCcw },
-  { path: '/editais', label: 'Editais', icon: FileText },
-  { path: '/edital', label: 'Edital Vertical', icon: ListChecks },
+  { path: '/edital', label: 'Editais', icon: FileText },
+  { path: '/conteudo', label: 'Conteúdo', icon: ListChecks },
   { path: '/dificuldades', label: 'Dificuldades', icon: AlertTriangle },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
-];
-
-const coordinatorNavItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/turmas', label: 'Turmas', icon: School },
-  { path: '/alunos', label: 'Alunos', icon: Users },
-  { path: '/editais', label: 'Editais', icon: FileText },
-  { path: '/ciclo-aluno', label: 'Ciclo do Aluno', icon: CalendarCheck },
-  { path: '/dashboard-aluno', label: 'Dashboard Aluno', icon: Target },
-  { path: '/registrar', label: 'Registrar Estudo', icon: PenLine },
 ];
 
 const Layout = () => {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
-  const { role, setRoleOverride, isOverridden } = useUserRole();
   const { signOut } = useAuth();
 
-  const handleToggleRole = () => {
-    if (isOverridden) {
-      setRoleOverride(null);
-    } else {
-      setRoleOverride(role === 'coordinator' ? 'student' : 'coordinator');
-    }
-  };
-
-  const navItems = role === 'student' ? studentNavItems : coordinatorNavItems;
   const mobileMainItems = navItems.slice(0, 4);
   const mobileMoreItems = navItems.slice(4);
 
@@ -71,7 +49,7 @@ const Layout = () => {
           <div>
             <h1 className="text-base font-bold text-white leading-tight">StudyFlow</h1>
             <p className="text-[10px] leading-none" style={{ color: 'hsl(215 20% 45%)' }}>
-              {role === 'student' ? 'Área do Aluno' : 'Área do Coordenador'}
+              Minha Área
             </p>
           </div>
         </div>
@@ -114,22 +92,7 @@ const Layout = () => {
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-3 space-y-2" style={{ borderTop: '1px solid hsl(222 47% 14%)' }}>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start gap-2 text-xs h-8"
-            onClick={handleToggleRole}
-            style={{ color: 'hsl(215 20% 50%)', background: 'transparent' }}
-          >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            {isOverridden ? 'Voltar ao perfil real' : `Ver como ${role === 'coordinator' ? 'Aluno' : 'Coordenador'}`}
-          </Button>
-          {isOverridden && (
-            <Badge className="w-full justify-center text-xs" style={{ background: 'hsl(0 72% 51% / 0.15)', color: 'hsl(0 72% 65%)', border: '1px solid hsl(0 72% 51% / 0.3)' }}>
-              Modo: {role === 'student' ? 'Aluno' : 'Coordenador'}
-            </Badge>
-          )}
+        <div className="px-3 py-3" style={{ borderTop: '1px solid hsl(222 47% 14%)' }}>
           <Button
             variant="ghost"
             size="sm"
