@@ -3,16 +3,19 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Clock, Target, Flame, TrendingUp, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Clock, Target, Flame, TrendingUp, AlertTriangle, RotateCcw, Timer } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { startOfWeek, addDays, format } from 'date-fns';
 import { NextActionCard } from '@/components/NextActionCard';
 import { GamificationCard } from '@/components/GamificationCard';
 import { DailyPlan } from '@/components/DailyPlan';
+import { StudyHeatmap } from '@/components/StudyHeatmap';
 import { getTopSuggestion } from '@/lib/suggestions';
 import { getUserStats, checkUnlockedBadges } from '@/lib/gamification';
 
 const Dashboard = () => {
   const { subjects, topics, studySessions, reviews, userProfile, loading, studyCycle } = useStudy();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -124,6 +127,11 @@ const Dashboard = () => {
         <div>
           <GamificationCard stats={userStats} badges={badges} compact />
         </div>
+      </div>
+
+      {/* Heatmap */}
+      <div className="mb-6">
+        <StudyHeatmap studySessions={studySessions} />
       </div>
 
       {/* Metric Cards */}

@@ -1,5 +1,6 @@
 import { PresetExam } from '@/types/study';
 import { presetGAC2025 } from './presetGAC2025';
+import { presetUFSC } from './presetUFSC';
 
 export const presetExams: PresetExam[] = [
   {
@@ -107,4 +108,5 @@ export const presetExams: PresetExam[] = [
     ],
   },
   presetGAC2025,
+  presetUFSC,
 ];
