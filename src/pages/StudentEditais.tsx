@@ -1,318 +1,332 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { FileText, CheckCircle, AlertTriangle, Download, ChevronRight, RefreshCw } from 'lucide-react';
+import { Pin, ChevronDown, ChevronUp, CheckCircle2, Circle, ChevronsUpDown, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useStudy } from '@/contexts/StudyContext';
+import { presetExams } from '@/data/presetExams';
 
-interface EditalTopic {
-  id: string;
-  name: string;
-  sort_order: number;
+type CheckType = 'studied' | 'rev7' | 'rev15' | 'rev30';
+interface TopicProgress { studied: boolean; rev7: boolean; rev15: boolean; rev30: boolean; }
+type EditalProgress = Record<string, TopicProgress>;
+
+function getSubjectColor(name: string): string {
+  const map: [string, string][] = [
+    ['Matem', 'hsl(217 91% 60%)'],
+    ['Física', 'hsl(280 80% 65%)'],
+    ['Quím', 'hsl(142 71% 45%)'],
+    ['Biolog', 'hsl(160 60% 45%)'],
+    ['Portugu', 'hsl(35 90% 55%)'],
+    ['Histór', 'hsl(15 80% 55%)'],
+    ['Geograf', 'hsl(195 80% 50%)'],
+    ['Filosofia', 'hsl(260 60% 60%)'],
+    ['Artes', 'hsl(330 70% 60%)'],
+    ['Língua', 'hsl(50 80% 55%)'],
+    ['Inglês', 'hsl(50 80% 55%)'],
+    ['Espanhol', 'hsl(50 80% 55%)'],
+    ['Redação', 'hsl(25 85% 55%)'],
+    ['Direito', 'hsl(200 75% 55%)'],
+    ['Informática', 'hsl(170 70% 45%)'],
+    ['Raciocínio', 'hsl(240 75% 60%)'],
+  ];
+  for (const [k, v] of map) {
+    if (name.includes(k)) return v;
+  }
+  const hash = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return `hsl(${hash % 360} 70% 55%)`;
 }
 
-interface EditalSubject {
-  id: string;
-  name: string;
-  color: string;
-  topics: EditalTopic[];
+const cardBg = 'hsl(222 47% 9%)';
+const border = 'hsl(222 47% 16%)';
+const muted = 'hsl(215 20% 50%)';
+const primaryBlue = 'hsl(217 91% 60%)';
+const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
+const STORAGE_KEY = 'studyflow_edital_progress_v2';
+const ACTIVE_KEY = 'studyflow_active_edital';
+
+function loadProgress(): EditalProgress {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
 }
 
-interface AvailableEdital {
-  id: string;
-  name: string;
-  description: string | null;
-  version: number;
-  subjects: EditalSubject[];
-  selected: boolean;
-  synced_version: number | null;
-  needsSync: boolean;
-}
+const StudentEditais: React.FC = () => {
+  const [activeExamId, setActiveExamId] = useState<string>(() =>
+    localStorage.getItem(ACTIVE_KEY) || presetExams[0]?.id || '');
+  const [progress, setProgress] = useState<EditalProgress>(loadProgress);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-const StudentEditais = () => {
-  const { user } = useAuth();
-  const { subjects: existingSubjects, topics: existingTopics, addSubject, addTopic } = useStudy();
-  const [editais, setEditais] = useState<AvailableEdital[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState<string | null>(null);
+  const activeExam = useMemo(() =>
+    presetExams.find(e => e.id === activeExamId) || presetExams[0], [activeExamId]);
 
-  const loadEditais = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }, [progress]);
+  useEffect(() => { localStorage.setItem(ACTIVE_KEY, activeExamId); setExpanded(new Set()); }, [activeExamId]);
 
-    // Fetch available editais (from student's class)
-    const { data: editaisData } = await (supabase as any)
-      .from('editais')
-      .select('*')
-      .order('name');
-
-    if (!editaisData || editaisData.length === 0) {
-      setEditais([]);
-      setLoading(false);
-      return;
-    }
-
-    // Fetch selections
-    const { data: selectionsData } = await (supabase as any)
-      .from('student_edital_selections')
-      .select('*')
-      .eq('user_id', user.id);
-
-    const selectionsMap = new Map(
-      (selectionsData || []).map((s: any) => [s.edital_id, s])
-    );
-
-    const result: AvailableEdital[] = [];
-    for (const ed of editaisData) {
-      const { data: subjectsData } = await (supabase as any)
-        .from('edital_subjects')
-        .select('*')
-        .eq('edital_id', ed.id)
-        .order('sort_order');
-
-      const subjects: EditalSubject[] = [];
-      if (subjectsData) {
-        for (const sub of subjectsData) {
-          const { data: topicsData } = await (supabase as any)
-            .from('edital_topics')
-            .select('*')
-            .eq('edital_subject_id', sub.id)
-            .order('sort_order');
-
-          subjects.push({
-            id: sub.id,
-            name: sub.name,
-            color: sub.color || '#4338CA',
-            topics: (topicsData || []).map((t: any) => ({ id: t.id, name: t.name, sort_order: t.sort_order })),
-          });
-        }
+  const globalStats = useMemo(() => {
+    if (!activeExam) return { studied: 0, rev7: 0, rev15: 0, rev30: 0, total: 0 };
+    let total = 0, studied = 0, rev7 = 0, rev15 = 0, rev30 = 0;
+    for (const sub of activeExam.subjects) {
+      for (const topic of sub.topics) {
+        total++;
+        const p = progress[`${activeExamId}|${sub.name}|${topic}`];
+        if (p?.studied) studied++;
+        if (p?.rev7) rev7++;
+        if (p?.rev15) rev15++;
+        if (p?.rev30) rev30++;
       }
-
-      const selection: any = selectionsMap.get(ed.id);
-      result.push({
-        id: ed.id,
-        name: ed.name,
-        description: ed.description,
-        version: ed.version,
-        subjects,
-        selected: !!selection,
-        synced_version: selection?.synced_version || null,
-        needsSync: selection ? selection.synced_version < ed.version : false,
-      });
     }
+    return { total, studied, rev7, rev15, rev30 };
+  }, [activeExam, activeExamId, progress]);
 
-    setEditais(result);
-    setLoading(false);
-  }, [user]);
+  function getSubjectStats(subjectName: string) {
+    const sub = activeExam?.subjects.find(s => s.name === subjectName);
+    if (!sub) return { total: 0, studied: 0 };
+    const studied = sub.topics.filter(t =>
+      progress[`${activeExamId}|${subjectName}|${t}`]?.studied).length;
+    return { total: sub.topics.length, studied };
+  }
 
-  useEffect(() => { loadEditais(); }, [loadEditais]);
+  function toggleCheck(subjectName: string, topic: string, type: CheckType) {
+    const key = `${activeExamId}|${subjectName}|${topic}`;
+    setProgress(prev => {
+      const cur = prev[key] || { studied: false, rev7: false, rev15: false, rev30: false };
+      return { ...prev, [key]: { ...cur, [type]: !cur[type] } };
+    });
+  }
 
-  // Check which topic names already exist to avoid duplication
-  const getExistingTopicNames = useCallback(() => {
-    return new Set(existingTopics.map(t => t.name.toLowerCase().trim()));
-  }, [existingTopics]);
+  function toggleSubject(name: string) {
+    setExpanded(prev => {
+      const n = new Set(prev);
+      n.has(name) ? n.delete(name) : n.add(name);
+      return n;
+    });
+  }
 
-  const getExistingSubjectNames = useCallback(() => {
-    return new Map(existingSubjects.map(s => [s.name.toLowerCase().trim(), s]));
-  }, [existingSubjects]);
+  function handleSelectExam(id: string) {
+    setActiveExamId(id);
+    toast.success(`Edital "${presetExams.find(e => e.id === id)?.name}" selecionado!`);
+  }
 
-  const handleImport = async (edital: AvailableEdital) => {
-    if (!user) return;
-    setImporting(edital.id);
+  if (!activeExam) return null;
+  const pct = (n: number) => globalStats.total > 0 ? Math.round((n / globalStats.total) * 100) : 0;
 
-    try {
-      const existingSubjectMap = getExistingSubjectNames();
-      const existingTopicSet = getExistingTopicNames();
-      let imported = 0;
-      let skipped = 0;
+  const progressItems = [
+    { label: 'Estudado', value: globalStats.studied, color: primaryBlue, icon: '📖' },
+    { label: 'Revisão 7 dias', value: globalStats.rev7, color: 'hsl(142 71% 45%)', icon: '🔄' },
+    { label: 'Revisão 15 dias', value: globalStats.rev15, color: 'hsl(280 80% 65%)', icon: '🔁' },
+    { label: 'Revisão 30 dias', value: globalStats.rev30, color: 'hsl(35 90% 55%)', icon: '✅' },
+  ];
 
-      for (const edSub of edital.subjects) {
-        // Check if subject already exists (case-insensitive)
-        let targetSubject = existingSubjectMap.get(edSub.name.toLowerCase().trim());
-
-        if (!targetSubject) {
-          // Create new subject
-          await addSubject(edSub.name, 3, edSub.color);
-          // Refetch to get the new subject
-          const { data: newSubs } = await (supabase as any)
-            .from('subjects')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('name', edSub.name)
-            .single();
-
-          if (newSubs) {
-            targetSubject = { id: newSubs.id, name: newSubs.name, color: newSubs.color, priority: newSubs.priority };
-          }
-        }
-
-        if (targetSubject) {
-          for (const topic of edSub.topics) {
-            const topicKey = topic.name.toLowerCase().trim();
-            if (existingTopicSet.has(topicKey)) {
-              skipped++;
-              continue;
-            }
-            await addTopic(targetSubject.id, topic.name);
-            existingTopicSet.add(topicKey);
-            imported++;
-          }
-        }
-      }
-
-      // Save selection
-      await (supabase as any).from('student_edital_selections').upsert({
-        user_id: user.id,
-        edital_id: edital.id,
-        synced_version: edital.version,
-        last_synced_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,edital_id' });
-
-      const msg = skipped > 0
-        ? `Importados ${imported} tópicos (${skipped} já existiam)`
-        : `Importados ${imported} tópicos com sucesso!`;
-      toast.success(msg);
-      loadEditais();
-    } catch (error) {
-      console.error(error);
-      toast.error('Erro ao importar edital');
-    } finally {
-      setImporting(null);
-    }
-  };
-
-  const handleSync = async (edital: AvailableEdital) => {
-    // Re-import only new content (deduplication handled automatically)
-    await handleImport(edital);
-  };
-
-  const handleRemoveSelection = async (editalId: string) => {
-    if (!user) return;
-    await (supabase as any)
-      .from('student_edital_selections')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('edital_id', editalId);
-    toast.success('Edital removido da seleção (conteúdos já importados foram mantidos)');
-    loadEditais();
-  };
-
-  const totalTopics = (edital: AvailableEdital) => edital.subjects.reduce((sum, s) => sum + s.topics.length, 0);
+  const checkColumns: { type: CheckType; color: string; cls: string }[] = [
+    { type: 'studied', color: primaryBlue, cls: 'w-16 flex justify-center' },
+    { type: 'rev7', color: 'hsl(142 71% 45%)', cls: 'w-14 justify-center hidden sm:flex' },
+    { type: 'rev15', color: 'hsl(280 80% 65%)', cls: 'w-14 justify-center hidden sm:flex' },
+    { type: 'rev30', color: 'hsl(35 90% 55%)', cls: 'w-14 justify-center hidden md:flex' },
+  ];
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-5xl mx-auto">
+      {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-          <FileText className="h-7 w-7" />
-          Editais Disponíveis
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Selecione os editais para incluir na sua rotina de estudo
+        <h1 className="text-2xl md:text-3xl font-bold text-white">Edital Verticalizado</h1>
+        <p className="mt-1 text-sm" style={{ color: muted }}>
+          Acompanhe seu progresso em cada tópico do edital
         </p>
       </div>
 
-      {loading ? (
-        <Card className="p-12 text-center">
-          <p className="text-muted-foreground">Carregando editais...</p>
-        </Card>
-      ) : editais.length === 0 ? (
-        <Card className="p-12 text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Nenhum edital disponível para sua turma</p>
-          <p className="text-sm text-muted-foreground mt-1">Peça ao seu coordenador para criar editais</p>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {editais.map(edital => (
-            <Card key={edital.id} className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    {edital.name}
-                    <Badge variant="outline" className="text-xs">v{edital.version}</Badge>
-                    {edital.selected && (
-                      <Badge className="text-xs bg-primary text-primary-foreground">
-                        <CheckCircle className="h-3 w-3 mr-1" /> Importado
-                      </Badge>
-                    )}
-                    {edital.needsSync && (
-                      <Badge variant="destructive" className="text-xs">
-                        <AlertTriangle className="h-3 w-3 mr-1" /> Atualização disponível
-                      </Badge>
-                    )}
-                  </h3>
-                  {edital.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{edital.description}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {edital.subjects.length} disciplinas · {totalTopics(edital)} tópicos
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  {edital.needsSync && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSync(edital)}
-                      disabled={importing === edital.id}
-                    >
-                      <RefreshCw className={`h-3.5 w-3.5 mr-1 ${importing === edital.id ? 'animate-spin' : ''}`} />
-                      Atualizar
-                    </Button>
-                  )}
-                  {!edital.selected ? (
-                    <Button
-                      size="sm"
-                      onClick={() => handleImport(edital)}
-                      disabled={importing === edital.id}
-                    >
-                      <Download className={`h-3.5 w-3.5 mr-1 ${importing === edital.id ? 'animate-spin' : ''}`} />
-                      {importing === edital.id ? 'Importando...' : 'Importar'}
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleRemoveSelection(edital.id)}
-                    >
-                      Remover seleção
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <Accordion type="single" collapsible>
-                {edital.subjects.map(sub => (
-                  <AccordionItem key={sub.id} value={sub.id}>
-                    <AccordionTrigger className="text-sm py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sub.color }} />
-                        {sub.name}
-                        <Badge variant="secondary" className="text-xs ml-1">{sub.topics.length}</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="space-y-1 pl-5">
-                        {sub.topics.map(topic => (
-                          <li key={topic.id} className="text-sm text-muted-foreground flex items-center gap-2">
-                            <ChevronRight className="h-3 w-3 flex-shrink-0" />
-                            {topic.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </Card>
+      {/* Seleção de edital */}
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: muted }}>
+          Selecionar Edital
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {presetExams.map(exam => (
+            <button
+              key={exam.id}
+              onClick={() => handleSelectExam(exam.id)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{
+                background: activeExamId === exam.id ? primaryGradient : cardBg,
+                border: `1px solid ${activeExamId === exam.id ? 'transparent' : border}`,
+                color: activeExamId === exam.id ? 'white' : muted,
+                boxShadow: activeExamId === exam.id ? '0 0 16px hsl(217 91% 60% / 0.25)' : 'none',
+              }}
+            >
+              {activeExamId === exam.id && <Pin className="h-3.5 w-3.5" />}
+              {exam.name}
+            </button>
           ))}
         </div>
-      )}
+      </div>
+
+      {/* Progresso global */}
+      <Card className="mb-6 p-5" style={{ background: cardBg, border: `1px solid ${border}` }}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-white flex items-center gap-2">
+            <BookOpen className="h-4 w-4" style={{ color: primaryBlue }} />
+            Seu Progresso — {activeExam.name}
+          </h2>
+          <Badge style={{
+            background: 'hsl(217 91% 60% / 0.15)',
+            color: primaryBlue,
+            border: `1px solid hsl(217 91% 60% / 0.3)`
+          }}>
+            {globalStats.total} tópicos
+          </Badge>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {progressItems.map(item => (
+            <div key={item.label}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium" style={{ color: muted }}>
+                  {item.icon} {item.label}
+                </span>
+                <span className="text-xs font-bold" style={{ color: item.color }}>
+                  {pct(item.value)}% ({item.value}/{globalStats.total})
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'hsl(222 47% 14%)' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct(item.value)}%`, background: item.color }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Controles */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-medium text-white">{activeExam.subjects.length} disciplinas</p>
+        <div className="flex gap-2">
+          <Button
+            size="sm" variant="ghost"
+            onClick={() => setExpanded(new Set(activeExam.subjects.map(s => s.name)))}
+            className="text-xs h-8"
+            style={{ color: muted, border: `1px solid ${border}` }}
+          >
+            <ChevronsUpDown className="h-3.5 w-3.5 mr-1" /> Expandir Todas
+          </Button>
+          <Button
+            size="sm" variant="ghost"
+            onClick={() => setExpanded(new Set())}
+            className="text-xs h-8"
+            style={{ color: muted, border: `1px solid ${border}` }}
+          >
+            <ChevronUp className="h-3.5 w-3.5 mr-1" /> Retrair Todas
+          </Button>
+        </div>
+      </div>
+
+      {/* Disciplinas */}
+      <div className="space-y-2">
+        {activeExam.subjects.map(subject => {
+          const isOpen = expanded.has(subject.name);
+          const color = getSubjectColor(subject.name);
+          const stats = getSubjectStats(subject.name);
+          const subPct = stats.total > 0 ? Math.round((stats.studied / stats.total) * 100) : 0;
+
+          return (
+            <div key={subject.name} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: 'hidden' }}>
+              {/* Cabeçalho da disciplina */}
+              <button
+                onClick={() => toggleSubject(subject.name)}
+                className="w-full flex items-center justify-between px-4 py-3.5 transition-all"
+                style={{ background: isOpen ? 'hsl(222 47% 12%)' : cardBg }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+                  <span className="font-semibold text-white text-sm truncate">{subject.name}</span>
+                  <Badge
+                    className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
+                    style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}
+                  >
+                    {subject.topics.length}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                  <div className="hidden sm:flex items-center gap-2">
+                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(222 47% 18%)' }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${subPct}%`, background: color }} />
+                    </div>
+                    <span className="text-xs font-medium" style={{ color }}>{subPct}%</span>
+                  </div>
+                  {isOpen
+                    ? <ChevronUp className="h-4 w-4" style={{ color: muted }} />
+                    : <ChevronDown className="h-4 w-4" style={{ color: muted }} />
+                  }
+                </div>
+              </button>
+
+              {/* Tópicos */}
+              {isOpen && (
+                <div style={{ background: 'hsl(222 47% 7%)' }}>
+                  {/* Header das colunas */}
+                  <div
+                    className="flex items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: muted, borderBottom: `1px solid ${border}` }}
+                  >
+                    <span className="flex-1">Tópico</span>
+                    <div className="flex gap-3 flex-shrink-0">
+                      <span className="w-16 text-center">Estudado</span>
+                      <span className="w-14 text-center hidden sm:block">Rev. 7D</span>
+                      <span className="w-14 text-center hidden sm:block">Rev. 15D</span>
+                      <span className="w-14 text-center hidden md:block">Rev. 30D</span>
+                    </div>
+                  </div>
+
+                  {/* Linhas */}
+                  {subject.topics.map((topic, idx) => {
+                    const key = `${activeExamId}|${subject.name}|${topic}`;
+                    const p = progress[key] || { studied: false, rev7: false, rev15: false, rev30: false };
+
+                    return (
+                      <div
+                        key={topic}
+                        className="flex items-center px-4 py-2.5"
+                        style={{
+                          background: idx % 2 === 0 ? 'hsl(222 47% 7%)' : 'hsl(222 47% 8.5%)',
+                          borderBottom: idx < subject.topics.length - 1 ? `1px solid hsl(222 47% 12%)` : 'none',
+                        }}
+                      >
+                        <span
+                          className="flex-1 text-sm pr-4 leading-snug"
+                          style={{ color: p.studied ? 'hsl(215 20% 55%)' : 'hsl(215 20% 80%)' }}
+                        >
+                          {idx + 1}. {topic}
+                        </span>
+                        <div className="flex gap-3 flex-shrink-0">
+                          {checkColumns.map(({ type, color: c, cls }) => (
+                            <div key={type} className={cls}>
+                              <button
+                                onClick={() => toggleCheck(subject.name, topic, type)}
+                                className="transition-transform hover:scale-110"
+                                disabled={type !== 'studied' && !p.studied}
+                              >
+                                {p[type]
+                                  ? <CheckCircle2 className="h-5 w-5" style={{ color: c }} />
+                                  : <Circle className="h-5 w-5" style={{
+                                    color: (type === 'studied' || p.studied)
+                                      ? 'hsl(222 47% 28%)'
+                                      : 'hsl(222 47% 18%)'
+                                  }} />
+                                }
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-center mt-6" style={{ color: 'hsl(222 47% 30%)' }}>
+        Seu progresso é salvo automaticamente no dispositivo.
+      </p>
     </div>
   );
 };
