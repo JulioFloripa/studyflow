@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Subject, Topic, StudySession, Review, StudyCycleItem, UserProfile, TopicStatus } from '@/types/study';
+import { Subject, Topic, StudySession, Review, StudyCycleItem, UserProfile, TopicStatus, SessionType, ClassMode } from '@/types/study';
 import { presetExams } from '@/data/presetExams';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -76,6 +76,8 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         minutesStudied: s.minutes_studied, questionsTotal: s.questions_total,
         questionsCorrect: s.questions_correct, pagesRead: s.pages_read,
         videosWatched: s.videos_watched, notes: s.notes,
+        sessionType: (s.session_type as SessionType) || 'study',
+        classMode: s.class_mode as ClassMode | undefined,
       })));
       if (revRes.data) setReviews(revRes.data.map((r: any) => ({
         id: r.id, topicId: r.topic_id, subjectId: r.subject_id,
@@ -148,12 +150,14 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       date: session.date, minutes_studied: session.minutesStudied,
       questions_total: session.questionsTotal, questions_correct: session.questionsCorrect,
       pages_read: session.pagesRead, videos_watched: session.videosWatched, notes: session.notes,
+      session_type: session.sessionType || 'study',
+      class_mode: session.classMode || null,
     } as any).select().single();
 
     if (data && !error) {
       setStudySessions(prev => [{ id: data.id, ...session }, ...prev]);
 
-      // Auto-schedule reviews
+      // Auto-schedule reviews (both for study and class sessions)
       const intervals = userProfile.reviewIntervals || [1, 7, 30];
       const types: Array<'D1' | 'D7' | 'D30'> = ['D1', 'D7', 'D30'];
       const reviewInserts = intervals.map((days, idx) => {
@@ -194,13 +198,11 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (data?.questionsCorrect !== undefined) updates.questions_correct = data.questionsCorrect;
     if (data?.easeFactor !== undefined) updates.ease_factor = data.easeFactor;
 
-    // Calcular próxima revisão se easeFactor foi fornecido
     if (data?.easeFactor) {
       const currentInterval = review.type === 'D1' ? 1 : review.type === 'D7' ? 7 : 30;
       const { nextInterval } = calculateNextReview(currentInterval, data.easeFactor, review.easeFactor);
       updates.next_interval = nextInterval;
 
-      // Agendar próxima revisão automaticamente
       const nextDate = new Date(review.scheduledDate);
       nextDate.setDate(nextDate.getDate() + nextInterval);
       const nextType = getReviewType(nextInterval);
@@ -219,11 +221,11 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!error) {
       setReviews(prev => prev.map(r => r.id === reviewId ? {
         ...r, completed: true, completedDate: updates.completed_date,
-        minutesSpent: data?.minutes, questionsTotal: data?.questionsTotal, 
+        minutesSpent: data?.minutes, questionsTotal: data?.questionsTotal,
         questionsCorrect: data?.questionsCorrect, easeFactor: data?.easeFactor,
         nextInterval: updates.next_interval,
       } : r));
-      await refreshData(); // Refresh para pegar a nova revisão agendada
+      await refreshData();
     }
   }, [user, reviews, refreshData]);
 
@@ -234,7 +236,6 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const preset = presetExams.find(p => p.id === presetId);
     if (!preset) return;
 
-    // Insert subjects
     const subjectInserts = preset.subjects.map((s, idx) => ({
       user_id: user.id, name: s.name, priority: s.priority,
       color: SUBJECT_COLORS[(subjects.length + idx) % SUBJECT_COLORS.length],
@@ -242,7 +243,6 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { data: subData } = await supabase.from('subjects').insert(subjectInserts as any).select();
     if (!subData) return;
 
-    // Insert topics
     const topicInserts: any[] = [];
     preset.subjects.forEach((s, idx) => {
       const dbSubject = subData[idx];
@@ -253,7 +253,6 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
     await supabase.from('topics').insert(topicInserts as any);
 
-    // Track import
     await supabase.from('imported_presets').insert({ user_id: user.id, preset_id: presetId } as any);
     setImportedPresets(prev => [...prev, presetId]);
 
@@ -265,7 +264,6 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const totalPriority = subjects.reduce((sum, s) => sum + s.priority, 0);
     const totalMinutes = Object.values(userProfile.availability).reduce((sum, h) => sum + h * 60, 0);
 
-    // Clear old cycle
     await supabase.from('study_cycle').delete().eq('user_id', user.id);
 
     const items: any[] = [];

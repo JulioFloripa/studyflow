@@ -1,4 +1,6 @@
 export type TopicStatus = 'not_started' | 'in_progress' | 'completed';
+export type SessionType = 'study' | 'class';
+export type ClassMode = 'presencial' | 'online' | 'gravada';
 
 export interface Subject {
   id: string;
@@ -26,6 +28,8 @@ export interface StudySession {
   pagesRead: number;
   videosWatched: number;
   notes: string;
+  sessionType: SessionType;
+  classMode?: ClassMode;
 }
 
 export interface Review {

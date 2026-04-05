@@ -19,6 +19,7 @@ import Onboarding from "@/pages/Onboarding";
 import Plans from "@/pages/Plans";
 import StudentEditais from "@/pages/StudentEditais";
 import Timer from "@/pages/Timer";
+import MyPlan from "@/pages/MyPlan";
 import NotFound from "./pages/NotFound";
 import { BookOpen } from "lucide-react";
 
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/dificuldades" element={<Difficulties />} />
                 <Route path="/conquistas" element={<Gamification />} />
                 <Route path="/conteudo" element={<VerticalSyllabus />} />
+                <Route path="/meu-plano" element={<MyPlan />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

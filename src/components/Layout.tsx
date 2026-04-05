@@ -1,5 +1,5 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, FileText, LogOut, Timer } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw, ListChecks, AlertTriangle, Trophy, Menu, FileText, LogOut, Timer, Settings2 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ const navItems = [
   { path: '/conteudo', label: 'Conteúdo', icon: ListChecks },
   { path: '/dificuldades', label: 'Dificuldades', icon: AlertTriangle },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
+  { path: '/meu-plano', label: 'Meu Plano', icon: Settings2 },
 ];
 
 const Layout = () => {

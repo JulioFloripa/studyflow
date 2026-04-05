@@ -2,13 +2,24 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Pin, ChevronDown, ChevronUp, CheckCircle2, Circle, ChevronsUpDown, BookOpen } from 'lucide-react';
+import { Pin, ChevronDown, ChevronUp, CheckCircle2, Circle, ChevronsUpDown, BookOpen, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { presetExams } from '@/data/presetExams';
+import { useStudy } from '@/contexts/StudyContext';
 
-type CheckType = 'studied' | 'rev7' | 'rev15' | 'rev30';
-interface TopicProgress { studied: boolean; rev7: boolean; rev15: boolean; rev30: boolean; }
-type EditalProgress = Record<string, TopicProgress>;
+// Progress for the 3 review checkboxes is still stored locally (rev7/15/30)
+// because the reviews table already handles this via the spaced repetition engine.
+// The "Estudado" column is derived from the real topic status in the database.
+type ReviewType = 'rev7' | 'rev15' | 'rev30';
+type ReviewProgress = Record<string, { rev7: boolean; rev15: boolean; rev30: boolean }>;
+
+const cardBg = 'hsl(222 47% 9%)';
+const border = 'hsl(222 47% 16%)';
+const muted = 'hsl(215 20% 50%)';
+const primaryBlue = 'hsl(217 91% 60%)';
+const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
+const REVIEW_KEY = 'studyflow_review_checks_v1';
+const ACTIVE_KEY = 'studyflow_active_edital';
 
 function getSubjectColor(name: string): string {
   const map: [string, string][] = [
@@ -36,58 +47,56 @@ function getSubjectColor(name: string): string {
   return `hsl(${hash % 360} 70% 55%)`;
 }
 
-const cardBg = 'hsl(222 47% 9%)';
-const border = 'hsl(222 47% 16%)';
-const muted = 'hsl(215 20% 50%)';
-const primaryBlue = 'hsl(217 91% 60%)';
-const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
-const STORAGE_KEY = 'studyflow_edital_progress_v2';
-const ACTIVE_KEY = 'studyflow_active_edital';
-
-function loadProgress(): EditalProgress {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+function loadReviews(): ReviewProgress {
+  try { return JSON.parse(localStorage.getItem(REVIEW_KEY) || '{}'); } catch { return {}; }
 }
 
 const StudentEditais: React.FC = () => {
+  // Real data from the database via StudyContext
+  const { subjects, topics, studySessions, loading } = useStudy();
+
   const [activeExamId, setActiveExamId] = useState<string>(() =>
     localStorage.getItem(ACTIVE_KEY) || presetExams[0]?.id || '');
-  const [progress, setProgress] = useState<EditalProgress>(loadProgress);
+  const [reviewProgress, setReviewProgress] = useState<ReviewProgress>(loadReviews);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const activeExam = useMemo(() =>
     presetExams.find(e => e.id === activeExamId) || presetExams[0], [activeExamId]);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }, [progress]);
+  useEffect(() => { localStorage.setItem(REVIEW_KEY, JSON.stringify(reviewProgress)); }, [reviewProgress]);
   useEffect(() => { localStorage.setItem(ACTIVE_KEY, activeExamId); setExpanded(new Set()); }, [activeExamId]);
 
-  const globalStats = useMemo(() => {
-    if (!activeExam) return { studied: 0, rev7: 0, rev15: 0, rev30: 0, total: 0 };
-    let total = 0, studied = 0, rev7 = 0, rev15 = 0, rev30 = 0;
-    for (const sub of activeExam.subjects) {
-      for (const topic of sub.topics) {
-        total++;
-        const p = progress[`${activeExamId}|${sub.name}|${topic}`];
-        if (p?.studied) studied++;
-        if (p?.rev7) rev7++;
-        if (p?.rev15) rev15++;
-        if (p?.rev30) rev30++;
+  // Build a lookup: topicName -> isStudied (from real DB topics)
+  const studiedTopicNames = useMemo(() => {
+    const studied = new Set<string>();
+    for (const topic of topics) {
+      if (topic.status === 'in_progress' || topic.status === 'completed') {
+        studied.add(topic.name.toLowerCase().trim());
       }
     }
-    return { total, studied, rev7, rev15, rev30 };
-  }, [activeExam, activeExamId, progress]);
+    // Also mark topics that have at least one study session
+    for (const session of studySessions) {
+      const t = topics.find(tp => tp.id === session.topicId);
+      if (t) studied.add(t.name.toLowerCase().trim());
+    }
+    return studied;
+  }, [topics, studySessions]);
 
-  function getSubjectStats(subjectName: string) {
-    const sub = activeExam?.subjects.find(s => s.name === subjectName);
-    if (!sub) return { total: 0, studied: 0 };
-    const studied = sub.topics.filter(t =>
-      progress[`${activeExamId}|${subjectName}|${t}`]?.studied).length;
-    return { total: sub.topics.length, studied };
+  // Build a lookup: subjectName -> Subject (from DB)
+  const dbSubjectMap = useMemo(() => {
+    const map = new Map<string, typeof subjects[0]>();
+    for (const s of subjects) map.set(s.name.toLowerCase().trim(), s);
+    return map;
+  }, [subjects]);
+
+  function isTopicStudied(topicName: string): boolean {
+    return studiedTopicNames.has(topicName.toLowerCase().trim());
   }
 
-  function toggleCheck(subjectName: string, topic: string, type: CheckType) {
+  function toggleReview(subjectName: string, topic: string, type: ReviewType) {
     const key = `${activeExamId}|${subjectName}|${topic}`;
-    setProgress(prev => {
-      const cur = prev[key] || { studied: false, rev7: false, rev15: false, rev30: false };
+    setReviewProgress(prev => {
+      const cur = prev[key] || { rev7: false, rev15: false, rev30: false };
       return { ...prev, [key]: { ...cur, [type]: !cur[type] } };
     });
   }
@@ -105,6 +114,30 @@ const StudentEditais: React.FC = () => {
     toast.success(`Edital "${presetExams.find(e => e.id === id)?.name}" selecionado!`);
   }
 
+  const globalStats = useMemo(() => {
+    if (!activeExam) return { studied: 0, rev7: 0, rev15: 0, rev30: 0, total: 0 };
+    let total = 0, studied = 0, rev7 = 0, rev15 = 0, rev30 = 0;
+    for (const sub of activeExam.subjects) {
+      for (const topic of sub.topics) {
+        total++;
+        if (isTopicStudied(topic)) studied++;
+        const rp = reviewProgress[`${activeExamId}|${sub.name}|${topic}`];
+        if (rp?.rev7) rev7++;
+        if (rp?.rev15) rev15++;
+        if (rp?.rev30) rev30++;
+      }
+    }
+    return { total, studied, rev7, rev15, rev30 };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeExam, activeExamId, studiedTopicNames, reviewProgress]);
+
+  function getSubjectStats(subjectName: string) {
+    const sub = activeExam?.subjects.find(s => s.name === subjectName);
+    if (!sub) return { total: 0, studied: 0 };
+    const studied = sub.topics.filter(t => isTopicStudied(t)).length;
+    return { total: sub.topics.length, studied };
+  }
+
   if (!activeExam) return null;
   const pct = (n: number) => globalStats.total > 0 ? Math.round((n / globalStats.total) * 100) : 0;
 
@@ -115,22 +148,38 @@ const StudentEditais: React.FC = () => {
     { label: 'Revisão 30 dias', value: globalStats.rev30, color: 'hsl(35 90% 55%)', icon: '✅' },
   ];
 
-  const checkColumns: { type: CheckType; color: string; cls: string }[] = [
-    { type: 'studied', color: primaryBlue, cls: 'w-16 flex justify-center' },
-    { type: 'rev7', color: 'hsl(142 71% 45%)', cls: 'w-14 justify-center hidden sm:flex' },
-    { type: 'rev15', color: 'hsl(280 80% 65%)', cls: 'w-14 justify-center hidden sm:flex' },
-    { type: 'rev30', color: 'hsl(35 90% 55%)', cls: 'w-14 justify-center hidden md:flex' },
+  const reviewColumns: { type: ReviewType; color: string; cls: string; label: string }[] = [
+    { type: 'rev7', color: 'hsl(142 71% 45%)', cls: 'w-14 justify-center hidden sm:flex', label: 'Rev. 7D' },
+    { type: 'rev15', color: 'hsl(280 80% 65%)', cls: 'w-14 justify-center hidden sm:flex', label: 'Rev. 15D' },
+    { type: 'rev30', color: 'hsl(35 90% 55%)', cls: 'w-14 justify-center hidden md:flex', label: 'Rev. 30D' },
   ];
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-white">Edital Verticalizado</h1>
-        <p className="mt-1 text-sm" style={{ color: muted }}>
-          Acompanhe seu progresso em cada tópico do edital
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-white">Edital Verticalizado</h1>
+          <p className="mt-1 text-sm" style={{ color: muted }}>
+            Progresso sincronizado com seus estudos registrados
+          </p>
+        </div>
+        {loading && (
+          <div className="flex items-center gap-2 text-xs" style={{ color: muted }}>
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Sincronizando...
+          </div>
+        )}
       </div>
+
+      {/* Aviso de sincronização */}
+      {subjects.length === 0 && !loading && (
+        <Card className="mb-6 p-4 flex items-center gap-3" style={{ background: 'hsl(35 90% 55% / 0.1)', border: '1px solid hsl(35 90% 55% / 0.3)' }}>
+          <span className="text-lg">⚠️</span>
+          <p className="text-sm" style={{ color: 'hsl(35 90% 65%)' }}>
+            Nenhum edital importado ainda. Acesse <strong>Plano de Estudos</strong> para importar um edital e seus tópicos aparecerão aqui automaticamente.
+          </p>
+        </Card>
+      )}
 
       {/* Seleção de edital */}
       <div className="mb-6">
@@ -138,22 +187,28 @@ const StudentEditais: React.FC = () => {
           Selecionar Edital
         </p>
         <div className="flex flex-wrap gap-2">
-          {presetExams.map(exam => (
-            <button
-              key={exam.id}
-              onClick={() => handleSelectExam(exam.id)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-              style={{
-                background: activeExamId === exam.id ? primaryGradient : cardBg,
-                border: `1px solid ${activeExamId === exam.id ? 'transparent' : border}`,
-                color: activeExamId === exam.id ? 'white' : muted,
-                boxShadow: activeExamId === exam.id ? '0 0 16px hsl(217 91% 60% / 0.25)' : 'none',
-              }}
-            >
-              {activeExamId === exam.id && <Pin className="h-3.5 w-3.5" />}
-              {exam.name}
-            </button>
-          ))}
+          {presetExams.map(exam => {
+            const hasImported = exam.subjects.some(s => dbSubjectMap.has(s.name.toLowerCase().trim()));
+            return (
+              <button
+                key={exam.id}
+                onClick={() => handleSelectExam(exam.id)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  background: activeExamId === exam.id ? primaryGradient : cardBg,
+                  border: `1px solid ${activeExamId === exam.id ? 'transparent' : border}`,
+                  color: activeExamId === exam.id ? 'white' : muted,
+                  boxShadow: activeExamId === exam.id ? '0 0 16px hsl(217 91% 60% / 0.25)' : 'none',
+                }}
+              >
+                {activeExamId === exam.id && <Pin className="h-3.5 w-3.5" />}
+                {exam.name}
+                {hasImported && (
+                  <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" title="Importado no seu plano" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -227,7 +282,6 @@ const StudentEditais: React.FC = () => {
 
           return (
             <div key={subject.name} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: 'hidden' }}>
-              {/* Cabeçalho da disciplina */}
               <button
                 onClick={() => toggleSubject(subject.name)}
                 className="w-full flex items-center justify-between px-4 py-3.5 transition-all"
@@ -257,10 +311,8 @@ const StudentEditais: React.FC = () => {
                 </div>
               </button>
 
-              {/* Tópicos */}
               {isOpen && (
                 <div style={{ background: 'hsl(222 47% 7%)' }}>
-                  {/* Header das colunas */}
                   <div
                     className="flex items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider"
                     style={{ color: muted, borderBottom: `1px solid ${border}` }}
@@ -268,16 +320,17 @@ const StudentEditais: React.FC = () => {
                     <span className="flex-1">Tópico</span>
                     <div className="flex gap-3 flex-shrink-0">
                       <span className="w-16 text-center">Estudado</span>
-                      <span className="w-14 text-center hidden sm:block">Rev. 7D</span>
-                      <span className="w-14 text-center hidden sm:block">Rev. 15D</span>
-                      <span className="w-14 text-center hidden md:block">Rev. 30D</span>
+                      {reviewColumns.map(col => (
+                        <span key={col.type} className={`text-center ${col.cls.replace('flex', 'block').replace('justify-center', '')}`}>
+                          {col.label}
+                        </span>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Linhas */}
                   {subject.topics.map((topic, idx) => {
-                    const key = `${activeExamId}|${subject.name}|${topic}`;
-                    const p = progress[key] || { studied: false, rev7: false, rev15: false, rev30: false };
+                    const studied = isTopicStudied(topic);
+                    const rp = reviewProgress[`${activeExamId}|${subject.name}|${topic}`] || { rev7: false, rev15: false, rev30: false };
 
                     return (
                       <div
@@ -290,25 +343,30 @@ const StudentEditais: React.FC = () => {
                       >
                         <span
                           className="flex-1 text-sm pr-4 leading-snug"
-                          style={{ color: p.studied ? 'hsl(215 20% 55%)' : 'hsl(215 20% 80%)' }}
+                          style={{ color: studied ? 'hsl(215 20% 55%)' : 'hsl(215 20% 80%)' }}
                         >
                           {idx + 1}. {topic}
                         </span>
                         <div className="flex gap-3 flex-shrink-0">
-                          {checkColumns.map(({ type, color: c, cls }) => (
-                            <div key={type} className={cls}>
+                          {/* Coluna Estudado — leitura do banco (somente leitura) */}
+                          <div className="w-16 flex justify-center">
+                            {studied
+                              ? <CheckCircle2 className="h-5 w-5" style={{ color: primaryBlue }} title="Estudado (registrado no app)" />
+                              : <Circle className="h-5 w-5" style={{ color: 'hsl(222 47% 28%)' }} title="Não estudado ainda" />
+                            }
+                          </div>
+                          {/* Colunas de revisão — marcação manual */}
+                          {reviewColumns.map(col => (
+                            <div key={col.type} className={col.cls}>
                               <button
-                                onClick={() => toggleCheck(subject.name, topic, type)}
+                                onClick={() => toggleReview(subject.name, topic, col.type)}
                                 className="transition-transform hover:scale-110"
-                                disabled={type !== 'studied' && !p.studied}
+                                disabled={!studied}
+                                title={studied ? `Marcar ${col.label}` : 'Estude o tópico primeiro'}
                               >
-                                {p[type]
-                                  ? <CheckCircle2 className="h-5 w-5" style={{ color: c }} />
-                                  : <Circle className="h-5 w-5" style={{
-                                    color: (type === 'studied' || p.studied)
-                                      ? 'hsl(222 47% 28%)'
-                                      : 'hsl(222 47% 18%)'
-                                  }} />
+                                {rp[col.type]
+                                  ? <CheckCircle2 className="h-5 w-5" style={{ color: col.color }} />
+                                  : <Circle className="h-5 w-5" style={{ color: studied ? 'hsl(222 47% 28%)' : 'hsl(222 47% 18%)' }} />
                                 }
                               </button>
                             </div>
@@ -325,7 +383,7 @@ const StudentEditais: React.FC = () => {
       </div>
 
       <p className="text-xs text-center mt-6" style={{ color: 'hsl(222 47% 30%)' }}>
-        Seu progresso é salvo automaticamente no dispositivo.
+        "Estudado" reflete seus registros reais. Revisões são marcadas manualmente.
       </p>
     </div>
   );
