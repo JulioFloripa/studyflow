@@ -61,8 +61,8 @@ const RegisterStudy = () => {
   };
 
   const sessionTypes = [
-    { value: 'study' as SessionType, label: 'Estudo', Icon: BookOpen, desc: 'Estudo autonomo, leitura, exercicios' },
-    { value: 'class' as SessionType, label: 'Aula', Icon: GraduationCap, desc: 'Aula assistida — gera revisoes automaticas' },
+    { value: 'study' as SessionType, label: 'Estudo', Icon: BookOpen, desc: 'Estudo autônomo, leitura, exercícios' },
+    { value: 'class' as SessionType, label: 'Aula', Icon: GraduationCap, desc: 'Aula assistida — gera revisões automáticas' },
   ];
   const classModes = [
     { value: 'presencial' as ClassMode, label: 'Presencial', Icon: Users },
@@ -74,10 +74,10 @@ const RegisterStudy = () => {
     <div className="p-4 md:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
-          <PenLine className="h-7 w-7" style={{ color: primaryBlue }} /> Registrar Sessao
+          <PenLine className="h-7 w-7" style={{ color: primaryBlue }} /> Registrar Sessão
         </h1>
         <p className="mt-1 text-sm" style={{ color: muted }}>
-          Registre um estudo autonomo ou uma aula — ambos geram revisoes automaticas
+          Registre um estudo autônomo ou uma aula — ambos geram revisões automáticas
         </p>
       </div>
 
@@ -91,7 +91,7 @@ const RegisterStudy = () => {
         <Card className="p-5 md:p-6" style={{ background: cardBg, border: `1px solid ${border}` }}>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Tipo de Sessao</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Tipo de Sessão</Label>
               <div className="grid grid-cols-2 gap-3">
                 {sessionTypes.map(({ value, label, Icon, desc }) => {
                   const active = sessionType === value;
@@ -201,8 +201,8 @@ const RegisterStudy = () => {
               <span className="text-base">📅</span>
               <p style={{ color: 'hsl(217 91% 75%)' }}>
                 {sessionType === 'class'
-                  ? 'Ao registrar esta aula, revisoes serao agendadas automaticamente em 1, 7 e 30 dias.'
-                  : 'Ao registrar este estudo, revisoes serao agendadas automaticamente em 1, 7 e 30 dias.'}
+                  ? 'Ao registrar esta aula, revisões serão agendadas automaticamente em 1, 7 e 30 dias.'
+                  : 'Ao registrar este estudo, revisões serão agendadas automaticamente em 1, 7 e 30 dias.'}
               </p>
             </div>
 
