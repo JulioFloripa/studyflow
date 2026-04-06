@@ -63,6 +63,8 @@ export interface UserProfile {
   availability: Record<string, number>;
   reviewIntervals: number[];
   unlockedBadges?: string[]; // IDs dos badges desbloqueados
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onboarding_data?: Record<string, any>; // Dados brutos do onboarding (dailyHours, studyDays, etc.)
 }
 
 export interface PresetExam {

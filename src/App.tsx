@@ -20,6 +20,7 @@ import Plans from "@/pages/Plans";
 import StudentEditais from "@/pages/StudentEditais";
 import Timer from "@/pages/Timer";
 import MyPlan from "@/pages/MyPlan";
+import WeeklySchedule from "@/pages/WeeklySchedule";
 import NotFound from "./pages/NotFound";
 import { BookOpen } from "lucide-react";
 
@@ -70,6 +71,7 @@ const App = () => (
                 <Route path="/conquistas" element={<Gamification />} />
                 <Route path="/conteudo" element={<VerticalSyllabus />} />
                 <Route path="/meu-plano" element={<MyPlan />} />
+                <Route path="/agenda" element={<WeeklySchedule />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

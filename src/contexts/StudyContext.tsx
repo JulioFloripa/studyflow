@@ -124,6 +124,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           examDate: p.exam_date || '',
           availability: (p.availability as Record<string, number>) || defaultProfile.availability,
           reviewIntervals: (p.review_intervals as number[]) || defaultProfile.reviewIntervals,
+          onboarding_data: p.onboarding_data ?? undefined,
         });
       }
       if (impRes.data) setImportedPresets(impRes.data.map((i: any) => i.preset_id));
