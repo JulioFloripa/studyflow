@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PenLine, CheckCircle2, BookOpen, GraduationCap, Monitor, Users, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { SessionType, ClassMode } from '@/types/study';
+import { localDateStr } from '@/lib/dateUtils';
 
 const cardBg = 'hsl(222 47% 9%)';
 const border = 'hsl(222 47% 16%)';
@@ -40,7 +41,7 @@ const RegisterStudy = () => {
     }
     await addStudySession({
       subjectId, topicId,
-      date: new Date().toISOString().split('T')[0],
+      date: localDateStr(),
       minutesStudied: parseInt(minutes) || 0,
       questionsTotal: parseInt(questionsTotal) || 0,
       questionsCorrect: parseInt(questionsCorrect) || 0,

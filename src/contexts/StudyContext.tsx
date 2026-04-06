@@ -4,6 +4,7 @@ import { presetExams } from '@/data/presetExams';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateNextReview, getReviewType, type EaseFactor } from '@/lib/spacedRepetition';
+import { localDateStr, addDaysLocal } from '@/lib/dateUtils';
 
 interface StudyContextType {
   subjects: Subject[];
@@ -54,6 +55,34 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [importedPresets, setImportedPresets] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Atualiza dados sem ativar o spinner de loading (usado após salvar sessões)
+  const refreshSilent = useCallback(async () => {
+    if (!user) return;
+    const [subRes, topRes, sessRes, revRes] = await Promise.all([
+      supabase.from('subjects').select('*').eq('user_id', user.id).order('created_at'),
+      supabase.from('topics').select('*').eq('user_id', user.id).order('created_at'),
+      supabase.from('study_sessions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+      supabase.from('reviews').select('*').eq('user_id', user.id).order('scheduled_date'),
+    ]);
+    if (subRes.data) setSubjects(subRes.data.map((s: any) => ({ id: s.id, name: s.name, priority: s.priority, color: s.color })));
+    if (topRes.data) setTopics(topRes.data.map((t: any) => ({ id: t.id, subjectId: t.subject_id, name: t.name, status: t.status as TopicStatus, tags: t.tags || [] })));
+    if (sessRes.data) setStudySessions(sessRes.data.map((s: any) => ({
+      id: s.id, topicId: s.topic_id, subjectId: s.subject_id, date: s.date,
+      minutesStudied: s.minutes_studied, questionsTotal: s.questions_total,
+      questionsCorrect: s.questions_correct, pagesRead: s.pages_read,
+      videosWatched: s.videos_watched, notes: s.notes,
+      sessionType: (s.session_type as SessionType) || 'study',
+      classMode: s.class_mode as ClassMode | undefined,
+    })));
+    if (revRes.data) setReviews(revRes.data.map((r: any) => ({
+      id: r.id, topicId: r.topic_id, subjectId: r.subject_id,
+      originalSessionId: r.original_session_id, scheduledDate: r.scheduled_date,
+      completed: r.completed, completedDate: r.completed_date,
+      minutesSpent: r.minutes_spent, questionsTotal: r.questions_total,
+      questionsCorrect: r.questions_correct, type: r.type as Review['type'],
+    })));
+  }, [user]);
 
   const refreshData = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -155,44 +184,35 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } as any).select().single();
 
     if (data && !error) {
-      setStudySessions(prev => [{ id: data.id, ...session }, ...prev]);
-
-      // Auto-schedule reviews (both for study and class sessions)
+      // Agendar revisões automaticamente
       const intervals = userProfile.reviewIntervals || [1, 7, 30];
       const types: Array<'D1' | 'D7' | 'D30'> = ['D1', 'D7', 'D30'];
-      const reviewInserts = intervals.map((days, idx) => {
-        const date = new Date(session.date);
-        date.setDate(date.getDate() + days);
-        return {
-          user_id: user.id, topic_id: session.topicId, subject_id: session.subjectId,
-          original_session_id: data.id, scheduled_date: date.toISOString().split('T')[0],
-          type: types[idx] || 'D30',
-        };
-      });
-      const { data: revData } = await supabase.from('reviews').insert(reviewInserts as any).select();
-      if (revData) {
-        const newReviews = revData.map((r: any) => ({
-          id: r.id, topicId: r.topic_id, subjectId: r.subject_id,
-          originalSessionId: r.original_session_id, scheduledDate: r.scheduled_date,
-          completed: r.completed, type: r.type as Review['type'],
-        }));
-        setReviews(prev => [...prev, ...newReviews]);
-      }
+      const reviewInserts = intervals.map((days, idx) => ({
+        user_id: user.id, topic_id: session.topicId, subject_id: session.subjectId,
+        original_session_id: data.id,
+        scheduled_date: addDaysLocal(session.date, days),
+        type: types[idx] || 'D30',
+      }));
+      await supabase.from('reviews').insert(reviewInserts as any);
 
-      // Update topic status
+      // Atualizar status do tópico no banco
       const topic = topics.find(t => t.id === session.topicId);
       if (topic && topic.status === 'not_started') {
-        await updateTopicStatus(session.topicId, 'in_progress');
+        await supabase.from('topics').update({ status: 'in_progress' } as any)
+          .eq('id', session.topicId).eq('user_id', user.id);
       }
+
+      // Sincronizar todas as telas silenciosamente (sem spinner)
+      await refreshSilent();
     }
-  }, [user, userProfile.reviewIntervals, topics, updateTopicStatus]);
+  }, [user, userProfile.reviewIntervals, topics, refreshSilent]);
 
   const markReviewDone = useCallback(async (reviewId: string, data?: { minutes?: number; questionsTotal?: number; questionsCorrect?: number; easeFactor?: EaseFactor }) => {
     if (!user) return;
     const review = reviews.find(r => r.id === reviewId);
     if (!review) return;
 
-    const updates: any = { completed: true, completed_date: new Date().toISOString().split('T')[0] };
+    const updates: any = { completed: true, completed_date: localDateStr() };
     if (data?.minutes !== undefined) updates.minutes_spent = data.minutes;
     if (data?.questionsTotal !== undefined) updates.questions_total = data.questionsTotal;
     if (data?.questionsCorrect !== undefined) updates.questions_correct = data.questionsCorrect;
@@ -203,16 +223,13 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const { nextInterval } = calculateNextReview(currentInterval, data.easeFactor, review.easeFactor);
       updates.next_interval = nextInterval;
 
-      const nextDate = new Date(review.scheduledDate);
-      nextDate.setDate(nextDate.getDate() + nextInterval);
       const nextType = getReviewType(nextInterval);
-
       await supabase.from('reviews').insert({
         user_id: user.id,
         topic_id: review.topicId,
         subject_id: review.subjectId,
         original_session_id: review.originalSessionId,
-        scheduled_date: nextDate.toISOString().split('T')[0],
+        scheduled_date: addDaysLocal(review.scheduledDate, nextInterval),
         type: nextType,
       } as any);
     }

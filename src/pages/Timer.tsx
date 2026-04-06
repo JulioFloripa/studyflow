@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Play, Pause, Square, RotateCcw, Maximize2, Minimize2, Coffee, BookOpen, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { localDateStr } from '@/lib/dateUtils';
 
 type TimerMode = 'free' | 'pomodoro';
 type TimerState = 'idle' | 'running' | 'paused' | 'break';
@@ -70,7 +71,7 @@ const Timer = () => {
       await addStudySession({
         subjectId,
         topicId,
-        date: new Date().toISOString().split('T')[0],
+        date: localDateStr(),
         minutesStudied: elapsed,
         questionsTotal: 0,
         questionsCorrect: 0,
