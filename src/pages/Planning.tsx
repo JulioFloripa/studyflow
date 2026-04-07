@@ -169,7 +169,12 @@ const Planning: React.FC = () => {
   // ── Formatar por semana ─────────────────────────────────────────────
   const weekByDay = useMemo(() => {
     if (!cycleResult) return {} as Record<number, PlanBlock[]>;
-    const byDay = formatCycleForWeek(cycleResult.slots);
+    let byDay: Record<number, CycleSlot[]>;
+    try {
+      byDay = formatCycleForWeek(cycleResult);
+    } catch {
+      return {} as Record<number, PlanBlock[]>;
+    }
     const classDaySubjects: Record<number, Set<string>> = {};
     classes.forEach(c => {
       const d = DAY_MAP[c.dayId];
