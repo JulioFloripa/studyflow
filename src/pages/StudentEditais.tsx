@@ -1,25 +1,37 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Pin, ChevronDown, ChevronUp, CheckCircle2, Circle, ChevronsUpDown, BookOpen, RefreshCw } from 'lucide-react';
+import { Pin, ChevronDown, ChevronUp, ChevronsUpDown, BookOpen, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { presetExams } from '@/data/presetExams';
 import { useStudy } from '@/contexts/StudyContext';
+import { localDateStr } from '@/lib/dateUtils';
 
-// Progress for the 3 review checkboxes is still stored locally (rev7/15/30)
-// because the reviews table already handles this via the spaced repetition engine.
-// The "Estudado" column is derived from the real topic status in the database.
-type ReviewType = 'rev7' | 'rev15' | 'rev30';
-type ReviewProgress = Record<string, { rev7: boolean; rev15: boolean; rev30: boolean }>;
+// ─── Tipos ────────────────────────────────────────────────────────────
+type ColType = 'studied' | 'rev1' | 'rev7' | 'rev30';
 
+interface TopicState {
+  studied: boolean;
+  rev1: boolean;
+  rev7: boolean;
+  rev30: boolean;
+}
+
+// ─── Estilos ──────────────────────────────────────────────────────────
 const cardBg = 'hsl(222 47% 9%)';
 const border = 'hsl(222 47% 16%)';
 const muted = 'hsl(215 20% 50%)';
 const primaryBlue = 'hsl(217 91% 60%)';
 const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
-const REVIEW_KEY = 'studyflow_review_checks_v1';
 const ACTIVE_KEY = 'studyflow_active_edital';
+
+const COL_CONFIG: { type: ColType; label: string; color: string }[] = [
+  { type: 'studied', label: 'Estudado',  color: primaryBlue },
+  { type: 'rev1',    label: 'Rev. 1D',   color: 'hsl(142 71% 45%)' },
+  { type: 'rev7',    label: 'Rev. 7D',   color: 'hsl(280 80% 65%)' },
+  { type: 'rev30',   label: 'Rev. 30D',  color: 'hsl(35 90% 55%)' },
+];
 
 function getSubjectColor(name: string): string {
   const map: [string, string][] = [
@@ -47,66 +59,204 @@ function getSubjectColor(name: string): string {
   return `hsl(${hash % 360} 70% 55%)`;
 }
 
-function loadReviews(): ReviewProgress {
-  try { return JSON.parse(localStorage.getItem(REVIEW_KEY) || '{}'); } catch { return {}; }
+// ─── Bolinha de status clicável ───────────────────────────────────────
+interface StatusDotProps {
+  active: boolean;
+  color: string;
+  loading?: boolean;
+  disabled?: boolean;
+  title?: string;
+  onClick: () => void;
 }
 
+function StatusDot({ active, color, loading, disabled, title, onClick }: StatusDotProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      title={title}
+      className="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1"
+      style={{
+        background: active ? color : 'transparent',
+        border: `2px solid ${active ? color : 'hsl(222 47% 28%)'}`,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.35 : 1,
+        boxShadow: active ? `0 0 8px ${color}60` : 'none',
+        focusRingColor: color,
+      }}
+    >
+      {loading && <Loader2 className="h-3 w-3 animate-spin" style={{ color: active ? 'white' : muted }} />}
+      {!loading && active && (
+        <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none">
+          <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// ─── Componente principal ─────────────────────────────────────────────
 const StudentEditais: React.FC = () => {
-  // Real data from the database via StudyContext
-  const { subjects, topics, studySessions, loading } = useStudy();
+  const { subjects, topics, studySessions, reviews, addStudySession, updateTopicStatus, addTopic, loading } = useStudy();
 
   const [activeExamId, setActiveExamId] = useState<string>(() =>
     localStorage.getItem(ACTIVE_KEY) || presetExams[0]?.id || '');
-  const [reviewProgress, setReviewProgress] = useState<ReviewProgress>(loadReviews);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Controle de loading por bolinha: key = "subjectName|topicName|colType"
+  const [saving, setSaving] = useState<Set<string>>(new Set());
 
   const activeExam = useMemo(() =>
     presetExams.find(e => e.id === activeExamId) || presetExams[0], [activeExamId]);
 
-  useEffect(() => { localStorage.setItem(REVIEW_KEY, JSON.stringify(reviewProgress)); }, [reviewProgress]);
   useEffect(() => { localStorage.setItem(ACTIVE_KEY, activeExamId); setExpanded(new Set()); }, [activeExamId]);
 
-  // Build a lookup: topicName -> isStudied (from real DB topics)
-  const studiedTopicNames = useMemo(() => {
-    const studied = new Set<string>();
-    for (const topic of topics) {
-      if (topic.status === 'in_progress' || topic.status === 'completed') {
-        studied.add(topic.name.toLowerCase().trim());
-      }
-    }
-    // Also mark topics that have at least one study session
-    for (const session of studySessions) {
-      const t = topics.find(tp => tp.id === session.topicId);
-      if (t) studied.add(t.name.toLowerCase().trim());
-    }
-    return studied;
-  }, [topics, studySessions]);
+  // ── Lookup: topicName (lowercase) → topic do banco ──────────────────
+  const topicByName = useMemo(() => {
+    const map = new Map<string, typeof topics[0]>();
+    for (const t of topics) map.set(t.name.toLowerCase().trim(), t);
+    return map;
+  }, [topics]);
 
-  // Build a lookup: subjectName -> Subject (from DB)
-  const dbSubjectMap = useMemo(() => {
+  // ── Lookup: subjectName (lowercase) → subject do banco ──────────────
+  const subjectByName = useMemo(() => {
     const map = new Map<string, typeof subjects[0]>();
     for (const s of subjects) map.set(s.name.toLowerCase().trim(), s);
     return map;
   }, [subjects]);
 
-  function isTopicStudied(topicName: string): boolean {
-    return studiedTopicNames.has(topicName.toLowerCase().trim());
+  // ── Lookup: topicId → sessões de estudo ─────────────────────────────
+  const sessionsByTopic = useMemo(() => {
+    const map = new Map<string, typeof studySessions[0][]>();
+    for (const s of studySessions) {
+      if (!map.has(s.topicId)) map.set(s.topicId, []);
+      map.get(s.topicId)!.push(s);
+    }
+    return map;
+  }, [studySessions]);
+
+  // ── Lookup: topicId → revisões concluídas por tipo ──────────────────
+  const completedReviewsByTopic = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const r of reviews) {
+      if (!r.completed) continue;
+      if (!map.has(r.topicId)) map.set(r.topicId, new Set());
+      map.get(r.topicId)!.add(r.type); // 'D1', 'D7', 'D30'
+    }
+    return map;
+  }, [reviews]);
+
+  // ── Estado derivado de cada tópico ──────────────────────────────────
+  function getTopicState(topicName: string): TopicState {
+    const dbTopic = topicByName.get(topicName.toLowerCase().trim());
+    if (!dbTopic) return { studied: false, rev1: false, rev7: false, rev30: false };
+
+    const hasSessions = (sessionsByTopic.get(dbTopic.id) ?? []).length > 0;
+    const studied = hasSessions || dbTopic.status === 'in_progress' || dbTopic.status === 'completed';
+    const doneReviews = completedReviewsByTopic.get(dbTopic.id) ?? new Set<string>();
+
+    return {
+      studied,
+      rev1: doneReviews.has('D1'),
+      rev7: doneReviews.has('D7'),
+      rev30: doneReviews.has('D30'),
+    };
   }
 
-  function toggleReview(subjectName: string, topic: string, type: ReviewType) {
-    const key = `${activeExamId}|${subjectName}|${topic}`;
-    setReviewProgress(prev => {
-      const cur = prev[key] || { rev7: false, rev15: false, rev30: false };
-      return { ...prev, [key]: { ...cur, [type]: !cur[type] } };
-    });
-  }
+  // ── Ação ao clicar numa bolinha ──────────────────────────────────────
+  const handleDotClick = useCallback(async (
+    subjectName: string,
+    topicName: string,
+    colType: ColType,
+    currentState: TopicState
+  ) => {
+    const dotKey = `${subjectName}|${topicName}|${colType}`;
+    if (saving.has(dotKey)) return;
 
-  function toggleSubject(name: string) {
-    setExpanded(prev => {
-      const n = new Set(prev);
-      n.has(name) ? n.delete(name) : n.add(name);
-      return n;
-    });
+    // Encontrar ou criar o subject no banco
+    let dbSubject = subjectByName.get(subjectName.toLowerCase().trim());
+    if (!dbSubject) {
+      toast.error('Importe o edital primeiro em "Plano de Estudos" para marcar tópicos.');
+      return;
+    }
+
+    // Encontrar ou criar o tópico no banco
+    let dbTopic = topicByName.get(topicName.toLowerCase().trim());
+    if (!dbTopic) {
+      // Criar o tópico automaticamente ao marcar
+      try {
+        await addTopic(dbSubject.id, topicName);
+        // Aguardar um tick para o estado atualizar
+        await new Promise(r => setTimeout(r, 300));
+        dbTopic = topicByName.get(topicName.toLowerCase().trim());
+      } catch {
+        toast.error('Erro ao criar tópico.');
+        return;
+      }
+      if (!dbTopic) {
+        toast.error('Tópico não encontrado. Tente novamente.');
+        return;
+      }
+    }
+
+    setSaving(prev => new Set(prev).add(dotKey));
+
+    try {
+      if (colType === 'studied') {
+        if (!currentState.studied) {
+          // Marcar como estudado: criar sessão de estudo mínima
+          await addStudySession({
+            topicId: dbTopic.id,
+            subjectId: dbSubject.id,
+            date: localDateStr(),
+            minutesStudied: 30,
+            questionsTotal: 0,
+            questionsCorrect: 0,
+            pagesRead: 0,
+            videosWatched: 0,
+            notes: 'Marcado via edital verticalizado',
+            sessionType: 'study',
+          });
+          toast.success(`✅ "${topicName}" marcado como estudado!`);
+        } else {
+          // Desmarcar: mudar status para not_started
+          await updateTopicStatus(dbTopic.id, 'not_started');
+          toast.info(`↩️ "${topicName}" desmarcado.`);
+        }
+      } else {
+        // Revisões: apenas feedback visual (as revisões reais são agendadas automaticamente)
+        // Se quiser marcar manualmente uma revisão como concluída, usa a tela de Revisões
+        toast.info('Para marcar revisões, acesse a tela de Revisões e conclua as pendentes.');
+      }
+    } catch (err) {
+      toast.error('Erro ao salvar. Tente novamente.');
+    } finally {
+      setSaving(prev => { const n = new Set(prev); n.delete(dotKey); return n; });
+    }
+  }, [saving, subjectByName, topicByName, addStudySession, updateTopicStatus, addTopic]);
+
+  // ── Estatísticas globais ─────────────────────────────────────────────
+  const globalStats = useMemo(() => {
+    if (!activeExam) return { studied: 0, rev1: 0, rev7: 0, rev30: 0, total: 0 };
+    let total = 0, studied = 0, rev1 = 0, rev7 = 0, rev30 = 0;
+    for (const sub of activeExam.subjects) {
+      for (const topic of sub.topics) {
+        total++;
+        const state = getTopicState(topic);
+        if (state.studied) studied++;
+        if (state.rev1) rev1++;
+        if (state.rev7) rev7++;
+        if (state.rev30) rev30++;
+      }
+    }
+    return { total, studied, rev1, rev7, rev30 };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeExam, topicByName, sessionsByTopic, completedReviewsByTopic]);
+
+  function getSubjectStats(subjectName: string) {
+    const sub = activeExam?.subjects.find(s => s.name === subjectName);
+    if (!sub) return { total: 0, studied: 0 };
+    const studied = sub.topics.filter(t => getTopicState(t).studied).length;
+    return { total: sub.topics.length, studied };
   }
 
   function handleSelectExam(id: string) {
@@ -114,45 +264,17 @@ const StudentEditais: React.FC = () => {
     toast.success(`Edital "${presetExams.find(e => e.id === id)?.name}" selecionado!`);
   }
 
-  const globalStats = useMemo(() => {
-    if (!activeExam) return { studied: 0, rev7: 0, rev15: 0, rev30: 0, total: 0 };
-    let total = 0, studied = 0, rev7 = 0, rev15 = 0, rev30 = 0;
-    for (const sub of activeExam.subjects) {
-      for (const topic of sub.topics) {
-        total++;
-        if (isTopicStudied(topic)) studied++;
-        const rp = reviewProgress[`${activeExamId}|${sub.name}|${topic}`];
-        if (rp?.rev7) rev7++;
-        if (rp?.rev15) rev15++;
-        if (rp?.rev30) rev30++;
-      }
-    }
-    return { total, studied, rev7, rev15, rev30 };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeExam, activeExamId, studiedTopicNames, reviewProgress]);
-
-  function getSubjectStats(subjectName: string) {
-    const sub = activeExam?.subjects.find(s => s.name === subjectName);
-    if (!sub) return { total: 0, studied: 0 };
-    const studied = sub.topics.filter(t => isTopicStudied(t)).length;
-    return { total: sub.topics.length, studied };
-  }
-
   if (!activeExam) return null;
   const pct = (n: number) => globalStats.total > 0 ? Math.round((n / globalStats.total) * 100) : 0;
 
   const progressItems = [
-    { label: 'Estudado', value: globalStats.studied, color: primaryBlue, icon: '📖' },
-    { label: 'Revisão 7 dias', value: globalStats.rev7, color: 'hsl(142 71% 45%)', icon: '🔄' },
-    { label: 'Revisão 15 dias', value: globalStats.rev15, color: 'hsl(280 80% 65%)', icon: '🔁' },
-    { label: 'Revisão 30 dias', value: globalStats.rev30, color: 'hsl(35 90% 55%)', icon: '✅' },
+    { label: 'Estudado',    value: globalStats.studied, color: primaryBlue,            icon: '📖' },
+    { label: 'Revisão 1D',  value: globalStats.rev1,    color: 'hsl(142 71% 45%)',     icon: '🔄' },
+    { label: 'Revisão 7D',  value: globalStats.rev7,    color: 'hsl(280 80% 65%)',     icon: '🔁' },
+    { label: 'Revisão 30D', value: globalStats.rev30,   color: 'hsl(35 90% 55%)',      icon: '✅' },
   ];
 
-  const reviewColumns: { type: ReviewType; color: string; cls: string; label: string }[] = [
-    { type: 'rev7', color: 'hsl(142 71% 45%)', cls: 'w-14 justify-center hidden sm:flex', label: 'Rev. 7D' },
-    { type: 'rev15', color: 'hsl(280 80% 65%)', cls: 'w-14 justify-center hidden sm:flex', label: 'Rev. 15D' },
-    { type: 'rev30', color: 'hsl(35 90% 55%)', cls: 'w-14 justify-center hidden md:flex', label: 'Rev. 30D' },
-  ];
+  const dbSubjectMap = subjectByName;
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-5xl mx-auto">
@@ -161,7 +283,7 @@ const StudentEditais: React.FC = () => {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-white">Edital Verticalizado</h1>
           <p className="mt-1 text-sm" style={{ color: muted }}>
-            Progresso sincronizado com seus estudos registrados
+            Clique nas bolinhas para marcar seu progresso por tópico
           </p>
         </div>
         {loading && (
@@ -171,12 +293,12 @@ const StudentEditais: React.FC = () => {
         )}
       </div>
 
-      {/* Aviso de sincronização */}
+      {/* Aviso sem edital importado */}
       {subjects.length === 0 && !loading && (
         <Card className="mb-6 p-4 flex items-center gap-3" style={{ background: 'hsl(35 90% 55% / 0.1)', border: '1px solid hsl(35 90% 55% / 0.3)' }}>
           <span className="text-lg">⚠️</span>
           <p className="text-sm" style={{ color: 'hsl(35 90% 65%)' }}>
-            Nenhum edital importado ainda. Acesse <strong>Plano de Estudos</strong> para importar um edital e seus tópicos aparecerão aqui automaticamente.
+            Nenhum edital importado ainda. Acesse <strong>Plano de Estudos</strong> para importar um edital.
           </p>
         </Card>
       )}
@@ -219,11 +341,7 @@ const StudentEditais: React.FC = () => {
             <BookOpen className="h-4 w-4" style={{ color: primaryBlue }} />
             Seu Progresso — {activeExam.name}
           </h2>
-          <Badge style={{
-            background: 'hsl(217 91% 60% / 0.15)',
-            color: primaryBlue,
-            border: `1px solid hsl(217 91% 60% / 0.3)`
-          }}>
+          <Badge style={{ background: 'hsl(217 91% 60% / 0.15)', color: primaryBlue, border: `1px solid hsl(217 91% 60% / 0.3)` }}>
             {globalStats.total} tópicos
           </Badge>
         </div>
@@ -282,8 +400,15 @@ const StudentEditais: React.FC = () => {
 
           return (
             <div key={subject.name} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: 'hidden' }}>
+              {/* Cabeçalho da disciplina */}
               <button
-                onClick={() => toggleSubject(subject.name)}
+                onClick={() => {
+                  setExpanded(prev => {
+                    const n = new Set(prev);
+                    n.has(subject.name) ? n.delete(subject.name) : n.add(subject.name);
+                    return n;
+                  });
+                }}
                 className="w-full flex items-center justify-between px-4 py-3.5 transition-all"
                 style={{ background: isOpen ? 'hsl(222 47% 12%)' : cardBg }}
               >
@@ -311,17 +436,22 @@ const StudentEditais: React.FC = () => {
                 </div>
               </button>
 
+              {/* Lista de tópicos */}
               {isOpen && (
                 <div style={{ background: 'hsl(222 47% 7%)' }}>
+                  {/* Cabeçalho das colunas */}
                   <div
                     className="flex items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider"
                     style={{ color: muted, borderBottom: `1px solid ${border}` }}
                   >
                     <span className="flex-1">Tópico</span>
-                    <div className="flex gap-3 flex-shrink-0">
-                      <span className="w-16 text-center">Estudado</span>
-                      {reviewColumns.map(col => (
-                        <span key={col.type} className={`text-center ${col.cls.replace('flex', 'block').replace('justify-center', '')}`}>
+                    <div className="flex gap-2 flex-shrink-0">
+                      {COL_CONFIG.map(col => (
+                        <span
+                          key={col.type}
+                          className="w-9 text-center"
+                          style={{ color: col.color }}
+                        >
                           {col.label}
                         </span>
                       ))}
@@ -329,8 +459,7 @@ const StudentEditais: React.FC = () => {
                   </div>
 
                   {subject.topics.map((topic, idx) => {
-                    const studied = isTopicStudied(topic);
-                    const rp = reviewProgress[`${activeExamId}|${subject.name}|${topic}`] || { rev7: false, rev15: false, rev30: false };
+                    const state = getTopicState(topic);
 
                     return (
                       <div
@@ -341,36 +470,46 @@ const StudentEditais: React.FC = () => {
                           borderBottom: idx < subject.topics.length - 1 ? `1px solid hsl(222 47% 12%)` : 'none',
                         }}
                       >
+                        {/* Nome do tópico */}
                         <span
                           className="flex-1 text-sm pr-4 leading-snug"
-                          style={{ color: studied ? 'hsl(215 20% 55%)' : 'hsl(215 20% 80%)' }}
+                          style={{ color: state.studied ? 'hsl(215 20% 55%)' : 'hsl(215 20% 80%)' }}
                         >
                           {idx + 1}. {topic}
                         </span>
-                        <div className="flex gap-3 flex-shrink-0">
-                          {/* Coluna Estudado — leitura do banco (somente leitura) */}
-                          <div className="w-16 flex justify-center">
-                            {studied
-                              ? <CheckCircle2 className="h-5 w-5" style={{ color: primaryBlue }} title="Estudado (registrado no app)" />
-                              : <Circle className="h-5 w-5" style={{ color: 'hsl(222 47% 28%)' }} title="Não estudado ainda" />
-                            }
-                          </div>
-                          {/* Colunas de revisão — marcação manual */}
-                          {reviewColumns.map(col => (
-                            <div key={col.type} className={col.cls}>
-                              <button
-                                onClick={() => toggleReview(subject.name, topic, col.type)}
-                                className="transition-transform hover:scale-110"
-                                disabled={!studied}
-                                title={studied ? `Marcar ${col.label}` : 'Estude o tópico primeiro'}
-                              >
-                                {rp[col.type]
-                                  ? <CheckCircle2 className="h-5 w-5" style={{ color: col.color }} />
-                                  : <Circle className="h-5 w-5" style={{ color: studied ? 'hsl(222 47% 28%)' : 'hsl(222 47% 18%)' }} />
-                                }
-                              </button>
-                            </div>
-                          ))}
+
+                        {/* Bolinhas de status */}
+                        <div className="flex gap-2 flex-shrink-0">
+                          {COL_CONFIG.map(col => {
+                            const dotKey = `${subject.name}|${topic}|${col.type}`;
+                            const isActive = state[col.type];
+                            const isLoading = saving.has(dotKey);
+
+                            // Revisões só ficam ativas se já estudou
+                            // Mas são clicáveis para informar o usuário
+                            const isDisabled = col.type !== 'studied' && !state.studied;
+
+                            const title = col.type === 'studied'
+                              ? (isActive ? 'Clique para desmarcar' : 'Clique para marcar como estudado')
+                              : isDisabled
+                                ? 'Estude o tópico primeiro'
+                                : (isActive
+                                    ? `${col.label} concluída`
+                                    : `Marque na tela de Revisões`);
+
+                            return (
+                              <div key={col.type} className="w-9 flex justify-center">
+                                <StatusDot
+                                  active={isActive}
+                                  color={col.color}
+                                  loading={isLoading}
+                                  disabled={isDisabled}
+                                  title={title}
+                                  onClick={() => handleDotClick(subject.name, topic, col.type, state)}
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -382,8 +521,17 @@ const StudentEditais: React.FC = () => {
         })}
       </div>
 
-      <p className="text-xs text-center mt-6" style={{ color: 'hsl(222 47% 30%)' }}>
-        "Estudado" reflete seus registros reais. Revisões são marcadas manualmente.
+      {/* Legenda */}
+      <div className="mt-6 flex flex-wrap gap-4 justify-center">
+        {COL_CONFIG.map(col => (
+          <div key={col.type} className="flex items-center gap-2 text-xs" style={{ color: muted }}>
+            <div className="w-4 h-4 rounded-full border-2" style={{ borderColor: col.color, background: `${col.color}30` }} />
+            {col.label}
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-center mt-3" style={{ color: 'hsl(222 47% 30%)' }}>
+        Revisões 1D, 7D e 30D são agendadas automaticamente ao marcar "Estudado" e concluídas na tela de Revisões.
       </p>
     </div>
   );
