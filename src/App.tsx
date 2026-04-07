@@ -22,6 +22,7 @@ import Timer from "@/pages/Timer";
 import MyPlan from "@/pages/MyPlan";
 import WeeklySchedule from "@/pages/WeeklySchedule";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "@/pages/ResetPassword";
 import { BookOpen } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
               {/* Rotas públicas */}
               <Route path="/login" element={<Auth />} />
               <Route path="/planos" element={<Plans />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               {/* Onboarding — protegido mas fora do Layout */}
               <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />

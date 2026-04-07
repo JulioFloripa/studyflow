@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 const FLEMING_DOMAIN = '@flemingeducacao.com.br';
 
 const Auth = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -18,7 +18,22 @@ const Auth = () => {
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail.trim()) { toast.error('Informe seu e-mail.'); return; }
+    setForgotLoading(true);
+    const { error } = await resetPassword(forgotEmail.trim());
+    setForgotLoading(false);
+    if (error) {
+      toast.error('Erro ao enviar e-mail: ' + error);
+    } else {
+      setForgotSent(true);
+    }
+  };
 
   if (loading) {
     return (
@@ -190,9 +205,81 @@ const Auth = () => {
 
             {isLogin && (
               <div className="text-right">
-                <button type="button" className="text-xs transition-colors hover:underline" style={{ color: 'hsl(217 91% 60%)' }}>
+                <button
+                  type="button"
+                  onClick={() => { setForgotEmail(email); setShowForgot(true); setForgotSent(false); }}
+                  className="text-xs transition-colors hover:underline"
+                  style={{ color: 'hsl(217 91% 60%)' }}
+                >
                   Esqueci minha senha
                 </button>
+              </div>
+            )}
+
+            {/* Modal de recuperação de senha */}
+            {showForgot && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                style={{ background: 'rgba(0,0,0,0.7)' }}
+                onClick={() => setShowForgot(false)}
+              >
+                <div
+                  className="w-full max-w-sm rounded-2xl p-6"
+                  style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 20%)' }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {forgotSent ? (
+                    <div className="text-center">
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'hsl(142 71% 45% / 0.15)' }}>
+                        <CheckCircle2 className="h-6 w-6" style={{ color: 'hsl(142 71% 45%)' }} />
+                      </div>
+                      <h3 className="font-semibold text-white mb-2">E-mail enviado!</h3>
+                      <p className="text-sm mb-4" style={{ color: 'hsl(215 20% 55%)' }}>
+                        Verifique sua caixa de entrada em <strong className="text-white">{forgotEmail}</strong> e clique no link para redefinir sua senha.
+                      </p>
+                      <button
+                        onClick={() => setShowForgot(false)}
+                        className="w-full py-2.5 rounded-xl text-sm font-medium text-white"
+                        style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))' }}
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="font-semibold text-white mb-1">Recuperar senha</h3>
+                      <p className="text-sm mb-4" style={{ color: 'hsl(215 20% 55%)' }}>
+                        Informe seu e-mail e enviaremos um link para redefinir sua senha.
+                      </p>
+                      <Input
+                        type="email"
+                        value={forgotEmail}
+                        onChange={e => setForgotEmail(e.target.value)}
+                        placeholder="seu@email.com"
+                        className="h-11 rounded-xl mb-3"
+                        style={{ background: 'hsl(222 47% 12%)', border: '1px solid hsl(222 47% 20%)', color: 'hsl(210 40% 98%)' }}
+                        onKeyDown={e => e.key === 'Enter' && handleForgotPassword()}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowForgot(false)}
+                          className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+                          style={{ border: '1px solid hsl(222 47% 20%)', color: 'hsl(215 20% 55%)' }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleForgotPassword}
+                          disabled={forgotLoading}
+                          className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-2"
+                          style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))' }}
+                        >
+                          {forgotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar link'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
