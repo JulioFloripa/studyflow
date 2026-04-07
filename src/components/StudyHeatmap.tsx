@@ -13,8 +13,15 @@ interface StudyHeatmapProps {
   studySessions: StudySession[];
 }
 
-const WEEKS = 15; // ~3.5 meses
-const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+// Mostrar ~6 meses (26 semanas)
+const WEEKS = 26;
+
+// Dias visíveis na lateral (apenas ímpares para não poluir)
+const DAY_LABELS: { idx: number; label: string }[] = [
+  { idx: 1, label: 'Seg' },
+  { idx: 3, label: 'Qua' },
+  { idx: 5, label: 'Sex' },
+];
 
 function getIntensity(minutes: number): number {
   if (minutes === 0) return 0;
@@ -26,34 +33,34 @@ function getIntensity(minutes: number): number {
 
 function getColor(intensity: number): string {
   switch (intensity) {
-    case 0: return 'hsl(222 47% 12%)';
+    case 0: return 'hsl(222 47% 13%)';
     case 1: return 'hsl(217 91% 25%)';
     case 2: return 'hsl(217 91% 40%)';
     case 3: return 'hsl(217 91% 55%)';
     case 4: return 'hsl(217 91% 70%)';
-    default: return 'hsl(222 47% 12%)';
+    default: return 'hsl(222 47% 13%)';
   }
 }
 
 export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => {
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
 
-  // Mapa de data → minutos
+  // Mapa de data → minutos totais
   const sessionMap = useMemo(() => {
     const map: Record<string, number> = {};
     for (const s of studySessions) {
-      map[s.date] = (map[s.date] || 0) + s.minutesStudied;
+      if (s.date) map[s.date] = (map[s.date] || 0) + (s.minutesStudied || 0);
     }
     return map;
   }, [studySessions]);
 
-  // Calcular streak atual
+  // Streak atual (dias consecutivos até hoje)
   const streak = useMemo(() => {
     let count = 0;
     let d = new Date(today);
-    while (true) {
+    for (let i = 0; i < 365; i++) {
       const key = format(d, 'yyyy-MM-dd');
-      if (sessionMap[key] && sessionMap[key] > 0) {
+      if ((sessionMap[key] ?? 0) > 0) {
         count++;
         d = subDays(d, 1);
       } else {
@@ -63,58 +70,66 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
     return count;
   }, [sessionMap, today]);
 
-  // Gerar grid: WEEKS colunas × 7 linhas
-  const grid = useMemo(() => {
-    // Encontrar o domingo mais recente como início da última semana
+  // Grid: WEEKS colunas × 7 linhas, começando no domingo mais antigo
+  const { grid, monthLabels } = useMemo(() => {
+    // Última célula = hoje; primeira = WEEKS semanas atrás
     const endDate = today;
-    const startDate = subDays(endDate, WEEKS * 7 - 1);
+    const rawStart = subDays(endDate, WEEKS * 7 - 1);
+    // Recuar até o domingo da semana de rawStart
+    const gridStart = startOfWeek(rawStart, { weekStartsOn: 0 });
 
-    // Ajustar para começar no domingo
-    const gridStart = startOfWeek(startDate, { weekStartsOn: 0 });
+    const cells: {
+      date: string;
+      minutes: number;
+      intensity: number; // -1 = fora do range (futuro ou antes do início)
+      dayOfWeek: number;
+    }[] = [];
 
-    const cells: { date: string; minutes: number; intensity: number; dayOfWeek: number }[] = [];
-    let current = new Date(gridStart);
-
-    while (current <= endDate || cells.length < WEEKS * 7) {
-      const key = format(current, 'yyyy-MM-dd');
+    let cur = new Date(gridStart);
+    while (cells.length < WEEKS * 7) {
+      const key = format(cur, 'yyyy-MM-dd');
+      const isFuture = cur > endDate;
       const minutes = sessionMap[key] || 0;
       cells.push({
         date: key,
         minutes,
-        intensity: current > endDate ? -1 : getIntensity(minutes),
-        dayOfWeek: getDay(current),
+        intensity: isFuture ? -1 : getIntensity(minutes),
+        dayOfWeek: getDay(cur),
       });
-      current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
-      if (cells.length >= WEEKS * 7) break;
+      cur = new Date(cur.getTime() + 86400000);
     }
 
-    // Organizar em colunas (semanas)
+    // Agrupar em semanas (colunas)
     const weeks: typeof cells[] = [];
     for (let i = 0; i < cells.length; i += 7) {
       weeks.push(cells.slice(i, i + 7));
     }
-    return weeks;
-  }, [sessionMap, today]);
 
-  // Meses para o header
-  const monthLabels = useMemo(() => {
+    // Labels de meses (primeira semana de cada mês)
     const labels: { label: string; col: number }[] = [];
     let lastMonth = '';
-    grid.forEach((week, col) => {
-      const firstDay = week[0];
-      if (firstDay) {
-        const month = format(new Date(firstDay.date + 'T12:00:00'), 'MMM', { locale: ptBR });
-        if (month !== lastMonth) {
-          labels.push({ label: month.charAt(0).toUpperCase() + month.slice(1), col });
-          lastMonth = month;
+    weeks.forEach((week, col) => {
+      const first = week[0];
+      if (first && first.intensity >= 0) {
+        const month = format(new Date(first.date + 'T12:00:00'), 'MMM', { locale: ptBR });
+        const cap = month.charAt(0).toUpperCase() + month.slice(1);
+        if (cap !== lastMonth) {
+          labels.push({ label: cap, col });
+          lastMonth = cap;
         }
       }
     });
-    return labels;
-  }, [grid]);
+
+    return { grid: weeks, monthLabels: labels };
+  }, [sessionMap, today]);
 
   const totalDays = Object.values(sessionMap).filter(m => m > 0).length;
   const totalHours = Math.round(Object.values(sessionMap).reduce((s, m) => s + m, 0) / 60);
+
+  // Tamanho de cada célula (px) — fixo para manter consistência
+  const CELL = 13;
+  const GAP = 2;
+  const LABEL_W = 28; // largura da coluna de labels de dia
 
   return (
     <Card style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 16%)' }} className="p-5">
@@ -127,8 +142,8 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
         <div className="flex items-center gap-4">
           {streak > 0 && (
             <div className="flex items-center gap-1">
-              <span className="text-lg">🔥</span>
-              <span className="text-sm font-bold text-white">{streak} dias</span>
+              <span className="text-base">🔥</span>
+              <span className="text-sm font-bold text-white">{streak} dias seguidos</span>
             </div>
           )}
           <span className="text-xs" style={{ color: 'hsl(215 20% 50%)' }}>
@@ -137,17 +152,21 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="overflow-x-auto">
-        <div style={{ minWidth: WEEKS * 14 + 30 }}>
+      {/* Grid com scroll horizontal em telas pequenas */}
+      <div className="overflow-x-auto pb-1">
+        <div style={{ display: 'inline-block', minWidth: LABEL_W + WEEKS * (CELL + GAP) }}>
+
           {/* Labels de meses */}
-          <div className="flex mb-1 ml-8">
+          <div style={{ display: 'flex', marginLeft: LABEL_W, marginBottom: 4 }}>
             {grid.map((_, col) => {
               const label = monthLabels.find(m => m.col === col);
               return (
-                <div key={col} style={{ width: 12, marginRight: 2 }} className="text-center">
+                <div
+                  key={col}
+                  style={{ width: CELL + GAP, flexShrink: 0, overflow: 'visible' }}
+                >
                   {label && (
-                    <span className="text-[10px]" style={{ color: 'hsl(215 20% 45%)' }}>
+                    <span style={{ fontSize: 10, color: 'hsl(215 20% 48%)', whiteSpace: 'nowrap' }}>
                       {label.label}
                     </span>
                   )}
@@ -156,36 +175,72 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
             })}
           </div>
 
-          <div className="flex gap-0">
-            {/* Labels de dias da semana */}
-            <div className="flex flex-col gap-0.5 mr-2">
-              {DAYS_OF_WEEK.map((day, i) => (
-                <div
-                  key={day}
-                  style={{ height: 12, fontSize: 9, color: 'hsl(215 20% 40%)', lineHeight: '12px' }}
-                  className={i % 2 === 0 ? 'opacity-0' : ''}
-                >
-                  {day}
-                </div>
-              ))}
+          {/* Corpo: labels de dias + colunas de semanas */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+            {/* Coluna de labels de dias */}
+            <div
+              style={{
+                width: LABEL_W,
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: GAP,
+              }}
+            >
+              {Array.from({ length: 7 }, (_, i) => {
+                const found = DAY_LABELS.find(d => d.idx === i);
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      height: CELL,
+                      lineHeight: `${CELL}px`,
+                      fontSize: 9,
+                      color: 'hsl(215 20% 42%)',
+                      textAlign: 'right',
+                      paddingRight: 4,
+                    }}
+                  >
+                    {found ? found.label : ''}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Células */}
+            {/* Semanas */}
             {grid.map((week, col) => (
-              <div key={col} className="flex flex-col gap-0.5 mr-0.5">
+              <div
+                key={col}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: GAP,
+                  marginRight: GAP,
+                }}
+              >
                 {week.map((cell, row) => (
                   <div
                     key={`${col}-${row}`}
-                    title={cell.intensity >= 0 ? `${cell.date}: ${cell.minutes}min` : ''}
+                    title={
+                      cell.intensity > 0
+                        ? `${cell.date}: ${cell.minutes}min estudados`
+                        : cell.intensity === 0
+                        ? `${cell.date}: sem estudo`
+                        : ''
+                    }
                     style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 2,
-                      background: cell.intensity < 0 ? 'transparent' : getColor(cell.intensity),
+                      width: CELL,
+                      height: CELL,
+                      borderRadius: 3,
+                      background:
+                        cell.intensity < 0
+                          ? 'transparent'
+                          : getColor(cell.intensity),
                       cursor: cell.minutes > 0 ? 'pointer' : 'default',
                       transition: 'opacity 0.15s',
+                      flexShrink: 0,
                     }}
-                    className={cell.minutes > 0 ? 'hover:opacity-80' : ''}
+                    className={cell.minutes > 0 ? 'hover:opacity-75' : ''}
                   />
                 ))}
               </div>
@@ -193,15 +248,28 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
           </div>
 
           {/* Legenda */}
-          <div className="flex items-center gap-1 mt-3 justify-end">
-            <span className="text-[10px] mr-1" style={{ color: 'hsl(215 20% 40%)' }}>Menos</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              marginTop: 8,
+              justifyContent: 'flex-end',
+            }}
+          >
+            <span style={{ fontSize: 10, color: 'hsl(215 20% 42%)', marginRight: 2 }}>Menos</span>
             {[0, 1, 2, 3, 4].map(i => (
               <div
                 key={i}
-                style={{ width: 12, height: 12, borderRadius: 2, background: getColor(i) }}
+                style={{
+                  width: CELL,
+                  height: CELL,
+                  borderRadius: 3,
+                  background: getColor(i),
+                }}
               />
             ))}
-            <span className="text-[10px] ml-1" style={{ color: 'hsl(215 20% 40%)' }}>Mais</span>
+            <span style={{ fontSize: 10, color: 'hsl(215 20% 42%)', marginLeft: 2 }}>Mais</span>
           </div>
         </div>
       </div>
