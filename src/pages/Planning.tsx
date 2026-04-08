@@ -252,6 +252,15 @@ const Planning: React.FC = () => {
 
   const handleAddClass = () => {
     if (!newClass.subjectId) { toast.error('Selecione uma disciplina.'); return; }
+    if (newClass.startTime >= newClass.endTime) {
+      toast.error('O horário de início deve ser anterior ao horário de fim.');
+      return;
+    }
+    // Verificar duplicata no mesmo dia/horário
+    const isDuplicate = classes.some(
+      c => c.dayId === newClass.dayId && c.startTime === newClass.startTime && c.subjectId === newClass.subjectId
+    );
+    if (isDuplicate) { toast.error('Aula já cadastrada neste horário.'); return; }
     setClasses(prev => [...prev, { ...newClass, id: `cls-${Date.now()}` }]);
     toast.success('Aula adicionada!');
   };

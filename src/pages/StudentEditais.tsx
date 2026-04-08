@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Pin, ChevronDown, ChevronUp, ChevronsUpDown, BookOpen, RefreshCw, Loader2 } from 'lucide-react';
+import { Pin, ChevronDown, ChevronUp, ChevronsUpDown, BookOpen, RefreshCw, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { presetExams } from '@/data/presetExams';
 import { useStudy } from '@/contexts/StudyContext';
@@ -97,7 +97,18 @@ function StatusDot({ active, color, loading, disabled, title, onClick }: StatusD
 
 // ─── Componente principal ─────────────────────────────────────────────
 const StudentEditais: React.FC = () => {
-  const { subjects, topics, studySessions, reviews, addStudySession, updateTopicStatus, addTopic, loading } = useStudy();
+  const { subjects, topics, studySessions, reviews, addStudySession, updateTopicStatus, addTopic, removePreset, loading } = useStudy();
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const handleDeletePreset = async (presetId: string) => {
+    await removePreset(presetId);
+    setConfirmDelete(null);
+    if (activeExamId === presetId) {
+      const next = presetExams.find(e => e.id !== presetId);
+      if (next) setActiveExamId(next.id);
+    }
+    toast.success('Edital removido do seu plano.');
+  };
 
   const [activeExamId, setActiveExamId] = useState<string>(() =>
     localStorage.getItem(ACTIVE_KEY) || presetExams[0]?.id || '');
@@ -312,23 +323,49 @@ const StudentEditais: React.FC = () => {
           {presetExams.map(exam => {
             const hasImported = exam.subjects.some(s => dbSubjectMap.has(s.name.toLowerCase().trim()));
             return (
-              <button
-                key={exam.id}
-                onClick={() => handleSelectExam(exam.id)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-                style={{
-                  background: activeExamId === exam.id ? primaryGradient : cardBg,
-                  border: `1px solid ${activeExamId === exam.id ? 'transparent' : border}`,
-                  color: activeExamId === exam.id ? 'white' : muted,
-                  boxShadow: activeExamId === exam.id ? '0 0 16px hsl(217 91% 60% / 0.25)' : 'none',
-                }}
-              >
-                {activeExamId === exam.id && <Pin className="h-3.5 w-3.5" />}
-                {exam.name}
+              <div key={exam.id} className="flex items-center gap-1">
+                <button
+                  onClick={() => handleSelectExam(exam.id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{
+                    background: activeExamId === exam.id ? primaryGradient : cardBg,
+                    border: `1px solid ${activeExamId === exam.id ? 'transparent' : border}`,
+                    color: activeExamId === exam.id ? 'white' : muted,
+                    boxShadow: activeExamId === exam.id ? '0 0 16px hsl(217 91% 60% / 0.25)' : 'none',
+                  }}
+                >
+                  {activeExamId === exam.id && <Pin className="h-3.5 w-3.5" />}
+                  {exam.name}
+                  {hasImported && (
+                    <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" title="Importado no seu plano" />
+                  )}
+                </button>
                 {hasImported && (
-                  <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" title="Importado no seu plano" />
+                  confirmDelete === exam.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleDeletePreset(exam.id)}
+                        className="px-2 py-1 rounded-lg text-xs font-medium"
+                        style={{ background: 'hsl(0 70% 50%)', color: 'white' }}
+                      >Confirmar</button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="px-2 py-1 rounded-lg text-xs"
+                        style={{ color: muted, border: `1px solid ${border}` }}
+                      >Cancelar</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmDelete(exam.id); }}
+                      title="Remover edital do plano"
+                      className="p-1.5 rounded-lg transition-all hover:bg-red-500/20"
+                      style={{ color: muted }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )
                 )}
-              </button>
+              </div>
             );
           })}
         </div>

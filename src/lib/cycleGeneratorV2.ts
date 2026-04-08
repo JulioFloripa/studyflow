@@ -609,10 +609,17 @@ function generateRecommendations(
     recommendations.push('📅 Revise em intervalos crescentes: 1 dia, 3 dias, 1 semana, 1 mês');
   }
 
-  if (hoursPerWeek < 10) {
-    recommendations.push('⚠️ Poucas horas livres. Priorize disciplinas com maior peso.');
-  } else if (hoursPerWeek > 30) {
-    recommendations.push('⚠️ Cuidado com sobrecarga! Mantenha equilíbrio com descanso.');
+  if (hoursPerWeek < 5) {
+    recommendations.push('⚠️ Menos de 5h/semana disponíveis. Foque nos tópicos de maior peso no edital.');
+    recommendations.push('📌 Com pouco tempo, priorize revisões espaçadas em vez de conteúdo novo.');
+  } else if (hoursPerWeek < 10) {
+    recommendations.push('📈 Você tem ' + hoursPerWeek.toFixed(1) + 'h/semana. Tente aumentar gradualmente para 10h+ para cobrir mais conteúdo.');
+  } else if (hoursPerWeek >= 10 && hoursPerWeek <= 20) {
+    recommendations.push('✅ Carga semanal de ' + hoursPerWeek.toFixed(1) + 'h está ótima! Mantenha a consistência.');
+  } else if (hoursPerWeek > 20 && hoursPerWeek <= 30) {
+    recommendations.push('💪 ' + hoursPerWeek.toFixed(1) + 'h/semana é uma carga intensa. Garanta pausas e sono de qualidade.');
+  } else {
+    recommendations.push('⚠️ ' + hoursPerWeek.toFixed(1) + 'h/semana pode causar fadiga. Considere reduzir para 25-30h e manter qualidade.');
   }
 
   recommendations.push(

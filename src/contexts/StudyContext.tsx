@@ -24,6 +24,7 @@ interface StudyContextType {
   addStudySession: (session: Omit<StudySession, 'id'>) => Promise<void>;
   markReviewDone: (reviewId: string, data?: { minutes?: number; questionsTotal?: number; questionsCorrect?: number; easeFactor?: EaseFactor }) => Promise<void>;
   importPreset: (presetId: string) => Promise<void>;
+  removePreset: (presetId: string) => Promise<void>;
   generateCycle: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
   refreshData: () => Promise<void>;
@@ -277,6 +278,23 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await refreshData();
   }, [user, importedPresets, subjects.length, refreshData]);
 
+  const removePreset = useCallback(async (presetId: string) => {
+    if (!user) return;
+    const preset = presetExams.find(p => p.id === presetId);
+    if (!preset) return;
+
+    // Remover disciplinas e tópicos do preset (apenas os que têm o mesmo nome)
+    const presetSubjectNames = preset.subjects.map(s => s.name);
+    const subjectsToRemove = subjects.filter(s => presetSubjectNames.includes(s.name));
+    for (const s of subjectsToRemove) {
+      await supabase.from('topics').delete().eq('subject_id', s.id).eq('user_id', user.id);
+      await supabase.from('subjects').delete().eq('id', s.id).eq('user_id', user.id);
+    }
+    await supabase.from('imported_presets').delete().eq('user_id', user.id).eq('preset_id', presetId);
+    setImportedPresets(prev => prev.filter(p => p !== presetId));
+    await refreshData();
+  }, [user, importedPresets, subjects, refreshData]);
+
   const generateCycle = useCallback(async () => {
     if (!user || subjects.length === 0) return;
     const totalPriority = subjects.reduce((sum, s) => sum + s.priority, 0);
@@ -314,7 +332,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <StudyContext.Provider value={{
       subjects, topics, studySessions, reviews, studyCycle, userProfile, importedPresets, loading,
       addSubject, updateSubject, removeSubject, addTopic, updateTopicStatus, removeTopic,
-      addStudySession, markReviewDone, importPreset, generateCycle, updateProfile, refreshData,
+      addStudySession, markReviewDone, importPreset, removePreset, generateCycle, updateProfile, refreshData,
     }}>
       {children}
     </StudyContext.Provider>

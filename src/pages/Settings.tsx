@@ -48,7 +48,7 @@ const SettingsPage = () => {
             <Input value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Objetivo</Label>
+            <Label>Tipo de objetivo</Label>
             <Select value={form.objective} onValueChange={v => setForm(prev => ({ ...prev, objective: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -66,9 +66,12 @@ const SettingsPage = () => {
               <Input type="number" min="1" max="80" value={form.weeklyGoalHours} onChange={e => setForm(prev => ({ ...prev, weeklyGoalHours: parseInt(e.target.value) || 0 }))} />
             </div>
             <div className="space-y-2">
-              <Label>Data da prova</Label>
+              <Label>Data da próxima prova</Label>
               <Input type="date" value={form.examDate} onChange={e => setForm(prev => ({ ...prev, examDate: e.target.value }))} />
             </div>
+          </div>
+          <div className="rounded-lg p-3 text-sm" style={{ background: 'hsl(217 91% 60% / 0.08)', border: '1px solid hsl(217 91% 60% / 0.2)', color: 'hsl(217 91% 75%)' }}>
+            💡 <strong>Múltiplas provas?</strong> Gerencie seus editais diretamente na tela <strong>Editais</strong> — você pode importar quantos quiser e remover os que não precisar mais.
           </div>
         </Card>
 
