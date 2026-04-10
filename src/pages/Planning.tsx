@@ -1,25 +1,16 @@
 /**
- * Planning.tsx — Planejamento Semanal Inteligente
+ * Planning.tsx — Calendário Semanal Inteligente (estilo Google Calendar)
  *
- * Arquitetura:
- * 1. O algoritmo (cycleGeneratorV2) distribui os tópicos nos horários livres
- *    usando revisão espaçada (SM-2) + interleaving + prioridade por disciplina.
- * 2. Se o estudante cadastrou aulas, o algoritmo eleva a prioridade das
- *    disciplinas que tiveram aula naquele dia (memória fresca).
- * 3. O plano gerado pode ser editado: o estudante pode trocar a disciplina
- *    de qualquer bloco ou remover um bloco.
- * 4. Configurações de disponibilidade (horário de início, aulas) são salvas
- *    no localStorage e persistidas no Supabase via onboarding_data.
+ * Layout: grade de horários (linhas = horas, colunas = Seg–Dom)
+ * Navegação: avançar/recuar semanas com datas reais
+ * Blocos: gerados pelo cycleGeneratorV2 + posicionados na grade por horário
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
-  RefreshCw, Settings2, X,
-  BookOpen, Clock, Zap, Brain,
-  Plus, Trash2, Printer, CalendarDays, AlertCircle,
+  ChevronLeft, ChevronRight, RefreshCw, Settings2, X,
+  Printer, CalendarDays, AlertCircle, Plus, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStudy } from '@/contexts/StudyContext';
@@ -28,76 +19,117 @@ import { formatCycleForWeek, CycleSlot } from '@/lib/cycleGeneratorV2';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-// ─── Constantes ───────────────────────────────────────────────────────
-const cardBg = 'hsl(222 47% 9%)';
-const border = 'hsl(222 47% 16%)';
-const muted = 'hsl(215 20% 50%)';
-const primaryBlue = 'hsl(217 91% 60%)';
-const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
+// ─── Constantes ───────────────────────────────────────────────────────────────
+const DAY_NAMES  = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+const DAY_SHORT  = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+// Mapeamento: índice 0=Seg…6=Dom → dia da semana JS (1=Seg…0=Dom)
+const DAY_JS     = [1, 2, 3, 4, 5, 6, 0];
+const DAY_IDS    = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+const DAY_MAP: Record<string, number> = { seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6, dom: 0 };
 
-const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const DAY_IDS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-const DAY_MAP: Record<string, number> = { dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6 };
+// Horas exibidas na grade (06:00 – 23:00)
+const HOUR_START = 6;
+const HOUR_END   = 23;
+const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
 
 const SESSION_TYPE_LABELS: Record<string, string> = {
   immediate_review: 'Revisão Imediata',
-  spaced_review: 'Revisão Espaçada',
-  difficulty_review: 'Reforço',
-  deep_study: 'Estudo Profundo',
-  syllabus_week: 'Conteúdo da Semana',
-  practice: 'Exercícios',
+  spaced_review:    'Revisão Espaçada',
+  difficulty_review:'Reforço',
+  deep_study:       'Estudo Profundo',
+  syllabus_week:    'Conteúdo',
+  practice:         'Exercícios',
 };
 
 const SESSION_TYPE_COLORS: Record<string, string> = {
-  immediate_review: 'hsl(142 71% 45%)',
-  spaced_review: 'hsl(280 80% 65%)',
-  difficulty_review: 'hsl(15 80% 55%)',
-  deep_study: 'hsl(217 91% 60%)',
-  syllabus_week: 'hsl(195 80% 50%)',
-  practice: 'hsl(35 90% 55%)',
+  immediate_review: '#10b981',
+  spaced_review:    '#a855f7',
+  difficulty_review:'#f97316',
+  deep_study:       '#3b82f6',
+  syllabus_week:    '#06b6d4',
+  practice:         '#f59e0b',
 };
 
+// ─── Utilitários ──────────────────────────────────────────────────────────────
 function getSubjectColor(name: string, fallback?: string): string {
   if (fallback) return fallback;
   const map: [string, string][] = [
-    ['Matem', 'hsl(217 91% 60%)'], ['Física', 'hsl(280 80% 65%)'],
-    ['Quím', 'hsl(142 71% 45%)'], ['Biolog', 'hsl(160 60% 45%)'],
-    ['Portugu', 'hsl(35 90% 55%)'], ['Histór', 'hsl(15 80% 55%)'],
-    ['Geograf', 'hsl(195 80% 50%)'], ['Filosofia', 'hsl(260 60% 60%)'],
-    ['Inglês', 'hsl(50 80% 55%)'], ['Espanhol', 'hsl(50 80% 55%)'],
+    ['Matem', '#3b82f6'], ['Física', '#a855f7'], ['Quím', '#10b981'],
+    ['Biolog', '#059669'], ['Portugu', '#f59e0b'], ['Histór', '#f97316'],
+    ['Geograf', '#06b6d4'], ['Filosofia', '#8b5cf6'], ['Inglês', '#eab308'],
+    ['Espanhol', '#eab308'], ['Redação', '#ec4899'],
   ];
   for (const [k, v] of map) if (name.includes(k)) return v;
   const h = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return `hsl(${h % 360} 70% 55%)`;
 }
 
-function minutesToHM(m: number): string {
-  const h = Math.floor(m / 60);
-  const min = m % 60;
-  return h > 0 ? `${h}h${min > 0 ? ` ${min}min` : ''}` : `${min}min`;
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
 }
 
-// ─── Tipos locais ─────────────────────────────────────────────────────
+function minutesToHM(m: number): string {
+  const h = Math.floor(m / 60), min = m % 60;
+  return h > 0 ? `${h}h${min > 0 ? `${min}` : ''}` : `${min}min`;
+}
+
+/** Retorna a Segunda-feira da semana que contém `date` */
+function getMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Dom
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function formatMonthYear(date: Date): string {
+  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+}
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ClassEntry {
-  id: string;
-  dayId: string;
-  startTime: string;
-  endTime: string;
-  subjectId: string;
+  id: string; dayId: string; startTime: string; endTime: string; subjectId: string;
 }
 
 interface PlanBlock extends CycleSlot {
-  uid: string;
-  classHint?: boolean;
+  uid: string; classHint?: boolean;
+  // posição na grade em pixels
+  topPx: number; heightPx: number;
 }
 
-// ─── Componente ───────────────────────────────────────────────────────
+const CELL_HEIGHT = 60; // px por hora
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
 const Planning: React.FC = () => {
   const { user } = useAuth();
   const { subjects, topics, studySessions, userProfile, loading } = useStudy();
 
-  // ── Configuração ────────────────────────────────────────────────────
+  // ── Semana atual ────────────────────────────────────────────────────────────
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = semana atual
+  const monday = useMemo(() => {
+    const base = getMonday(new Date());
+    return addDays(base, weekOffset * 7);
+  }, [weekOffset]);
+
+  const weekDates = useMemo(() =>
+    Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
+
+  const isCurrentWeek = weekOffset === 0;
+  const todayJs = new Date().getDay(); // 0=Dom
+
+  // ── Configuração ────────────────────────────────────────────────────────────
   const [showConfig, setShowConfig] = useState(false);
   const [startTime, setStartTime] = useState<string>(() =>
     localStorage.getItem('plan_startTime') || '08:00');
@@ -108,15 +140,15 @@ const Planning: React.FC = () => {
     dayId: 'seg', startTime: '07:00', endTime: '08:30', subjectId: '',
   });
 
-  // ── Plano editável ──────────────────────────────────────────────────
+  // ── Plano editável ──────────────────────────────────────────────────────────
   const [editOverrides, setEditOverrides] = useState<Record<string, string | null>>({});
   const [refreshKey, setRefreshKey] = useState(0);
-  const [editingBlock, setEditingBlock] = useState<string | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
 
   useEffect(() => { localStorage.setItem('plan_startTime', startTime); }, [startTime]);
   useEffect(() => { localStorage.setItem('plan_classes', JSON.stringify(classes)); }, [classes]);
 
-  // ── Dados derivados ─────────────────────────────────────────────────
+  // ── Dados derivados ─────────────────────────────────────────────────────────
   const onboarding = useMemo(() => {
     const od = userProfile?.onboarding_data as Record<string, unknown> | undefined;
     return {
@@ -138,62 +170,58 @@ const Planning: React.FC = () => {
   const difficultyTopics = useMemo(() =>
     extractDifficultyTopics(
       studySessions.map(s => ({
-        subjectId: s.subjectId,
-        topicId: s.topicId,
+        subjectId: s.subjectId, topicId: s.topicId,
         topicName: topics.find(t => t.id === s.topicId)?.name,
-        correctAnswers: s.questionsCorrect,
-        totalQuestions: s.questionsTotal,
-      })),
-      subjects
+        correctAnswers: s.questionsCorrect, totalQuestions: s.questionsTotal,
+      })), subjects
     ), [studySessions, topics, subjects]);
 
-  // ── Gerar ciclo ─────────────────────────────────────────────────────
+  // ── Gerar ciclo ─────────────────────────────────────────────────────────────
   const cycleResult = useMemo(() => {
     if (subjects.length === 0) return null;
-    // Elevar prioridade de disciplinas com aula cadastrada
-    const subjectsWithHint = subjects.map(s => {
-      const hasClass = classes.some(c => c.subjectId === s.id);
-      return { ...s, priority: hasClass ? Math.min(s.priority + 1, 5) : s.priority };
-    });
+    const subjectsWithHint = subjects.map(s => ({
+      ...s, priority: classes.some(c => c.subjectId === s.id) ? Math.min(s.priority + 1, 5) : s.priority,
+    }));
     return generateStudentCycle(
       user?.id || 'anon',
       userProfile?.full_name || 'Estudante',
-      onboarding,
-      subjectsWithHint,
-      topicsBySubject,
-      difficultyTopics
+      onboarding, subjectsWithHint, topicsBySubject, difficultyTopics
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjects, onboarding, topicsBySubject, difficultyTopics, classes, refreshKey]);
 
-  // ── Formatar por semana ─────────────────────────────────────────────
+  // ── Formatar por dia da semana (0=Dom…6=Sáb) ───────────────────────────────
   const weekByDay = useMemo(() => {
     if (!cycleResult) return {} as Record<number, PlanBlock[]>;
     let byDay: Record<number, CycleSlot[]>;
-    try {
-      byDay = formatCycleForWeek(cycleResult);
-    } catch {
-      return {} as Record<number, PlanBlock[]>;
-    }
+    try { byDay = formatCycleForWeek(cycleResult); } catch { return {}; }
+
     const classDaySubjects: Record<number, Set<string>> = {};
     classes.forEach(c => {
       const d = DAY_MAP[c.dayId];
       if (!classDaySubjects[d]) classDaySubjects[d] = new Set();
       classDaySubjects[d].add(c.subjectId);
     });
+
     const result: Record<number, PlanBlock[]> = {};
     Object.entries(byDay).forEach(([dayStr, slots]) => {
       const day = parseInt(dayStr);
-      result[day] = (slots as CycleSlot[]).map((slot, i) => ({
-        ...slot,
-        uid: `${day}-${i}-${slot.subjectId}-${slot.startTime}`,
-        classHint: classDaySubjects[day]?.has(slot.subjectId) ?? false,
-      }));
+      result[day] = (slots as CycleSlot[]).map((slot, i) => {
+        const startMin = timeToMinutes(slot.startTime);
+        const topPx = (startMin - HOUR_START * 60) * (CELL_HEIGHT / 60);
+        const heightPx = Math.max(slot.duration * (CELL_HEIGHT / 60), 28);
+        return {
+          ...slot,
+          uid: `${day}-${i}-${slot.subjectId}-${slot.startTime}`,
+          classHint: classDaySubjects[day]?.has(slot.subjectId) ?? false,
+          topPx, heightPx,
+        };
+      });
     });
     return result;
   }, [cycleResult, classes]);
 
-  // ── Aplicar overrides ───────────────────────────────────────────────
+  // Aplicar overrides
   const planByDay = useMemo(() => {
     const result: Record<number, PlanBlock[]> = {};
     Object.entries(weekByDay).forEach(([dayStr, blocks]) => {
@@ -211,52 +239,12 @@ const Planning: React.FC = () => {
     return result;
   }, [weekByDay, editOverrides, subjects]);
 
-  const activeDays = useMemo(() =>
-    onboarding.studyDays.map(d => DAY_MAP[d]).filter(d => d !== undefined).sort((a, b) => a - b),
-    [onboarding.studyDays]);
-
-  const stats = useMemo(() => {
-    let totalMin = 0, sessions = 0;
-    const subjectMin: Record<string, number> = {};
-    Object.values(planByDay).forEach(blocks => {
-      blocks.forEach(b => {
-        totalMin += b.duration;
-        sessions++;
-        subjectMin[b.subjectName] = (subjectMin[b.subjectName] || 0) + b.duration;
-      });
-    });
-    return { totalMin, sessions, subjectMin };
-  }, [planByDay]);
-
-  // ── Handlers ────────────────────────────────────────────────────────
-  const handleRegenerateDay = useCallback((day: number) => {
-    setEditOverrides(prev => {
-      const next = { ...prev };
-      (weekByDay[day] || []).forEach(b => delete next[b.uid]);
-      return next;
-    });
-    setRefreshKey(k => k + 1);
-    toast.success(`Plano de ${DAY_NAMES[day]} regenerado!`);
-  }, [weekByDay]);
-
-  const handleSwapSubject = useCallback((uid: string, newSubjectId: string) => {
-    setEditOverrides(prev => ({ ...prev, [uid]: newSubjectId }));
-    setEditingBlock(null);
-    toast.success('Disciplina alterada!');
-  }, []);
-
-  const handleRemoveBlock = useCallback((uid: string) => {
-    setEditOverrides(prev => ({ ...prev, [uid]: null }));
-    toast.info('Bloco removido do plano.');
-  }, []);
-
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleAddClass = () => {
     if (!newClass.subjectId) { toast.error('Selecione uma disciplina.'); return; }
     if (newClass.startTime >= newClass.endTime) {
-      toast.error('O horário de início deve ser anterior ao horário de fim.');
-      return;
+      toast.error('O horário de início deve ser anterior ao horário de fim.'); return;
     }
-    // Verificar duplicata no mesmo dia/horário
     const isDuplicate = classes.some(
       c => c.dayId === newClass.dayId && c.startTime === newClass.startTime && c.subjectId === newClass.subjectId
     );
@@ -277,15 +265,27 @@ const Planning: React.FC = () => {
     toast.success('Configurações salvas! Plano atualizado.');
   };
 
-  // ── Estado vazio ────────────────────────────────────────────────────
+  const handleRemoveBlock = useCallback((uid: string) => {
+    setEditOverrides(prev => ({ ...prev, [uid]: null }));
+    setSelectedBlock(null);
+    toast.info('Bloco removido.');
+  }, []);
+
+  const handleSwapSubject = useCallback((uid: string, newSubjectId: string) => {
+    setEditOverrides(prev => ({ ...prev, [uid]: newSubjectId }));
+    setSelectedBlock(null);
+    toast.success('Disciplina alterada!');
+  }, []);
+
+  // ── Estado vazio ─────────────────────────────────────────────────────────────
   if (!loading && subjects.length === 0) {
     return (
-      <div className="p-6 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: primaryGradient }}>
+      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600">
           <CalendarDays className="h-8 w-8 text-white" />
         </div>
-        <h2 className="text-xl font-bold text-white text-center">Nenhum edital importado</h2>
-        <p className="text-sm text-center" style={{ color: muted }}>
+        <h2 className="text-xl font-bold text-foreground">Nenhum edital importado</h2>
+        <p className="text-sm text-muted-foreground text-center max-w-sm">
           Acesse <strong>Plano de Estudos</strong> para importar um edital.
           O planejamento semanal será gerado automaticamente.
         </p>
@@ -293,90 +293,143 @@ const Planning: React.FC = () => {
     );
   }
 
+  // ── Total de horas da semana ─────────────────────────────────────────────────
+  const totalMin = Object.values(planByDay).flat().reduce((s, b) => s + b.duration, 0);
+
   return (
-    <div className="p-4 md:p-6 lg:p-8 max-w-5xl mx-auto print:p-4">
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-6 print:mb-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Planejamento Semanal</h1>
-          <p className="mt-1 text-sm" style={{ color: muted }}>
-            Gerado pelo algoritmo · {stats.sessions} sessões · {minutesToHM(stats.totalMin)} esta semana
-          </p>
+    <div className="flex flex-col h-full bg-background">
+      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border print:hidden">
+        <div className="flex items-center gap-3">
+          {/* Navegação de semana */}
+          <button
+            onClick={() => setWeekOffset(0)}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-accent transition-colors"
+          >
+            Hoje
+          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setWeekOffset(w => w - 1)}
+              className="p-1.5 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setWeekOffset(w => w + 1)}
+              className="p-1.5 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <h2 className="text-base font-semibold text-foreground capitalize">
+            {formatMonthYear(monday)}
+          </h2>
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            {formatDate(monday)} – {formatDate(weekDates[6])}
+          </span>
         </div>
-        <div className="flex gap-2 print:hidden flex-wrap justify-end">
-          <Button size="sm" variant="ghost"
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground hidden md:inline">
+            {minutesToHM(totalMin)} esta semana
+          </span>
+          <Button size="sm" variant="outline"
             onClick={() => { setRefreshKey(k => k + 1); setEditOverrides({}); toast.success('Plano regenerado!'); }}
-            style={{ color: muted, border: `1px solid ${border}` }}
+            className="gap-1.5 text-xs"
           >
-            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Regenerar
+            <RefreshCw className="h-3.5 w-3.5" /> Regenerar
           </Button>
-          <Button size="sm" variant="ghost"
+          <Button size="sm" variant="outline"
             onClick={() => setShowConfig(v => !v)}
-            style={{ color: showConfig ? primaryBlue : muted, border: `1px solid ${showConfig ? primaryBlue : border}` }}
+            className="gap-1.5 text-xs"
           >
-            <Settings2 className="h-3.5 w-3.5 mr-1" /> Configurar
+            <Settings2 className="h-3.5 w-3.5" /> Configurar
           </Button>
-          <Button size="sm" variant="ghost"
+          <Button size="sm" variant="outline"
             onClick={() => window.print()}
-            style={{ color: muted, border: `1px solid ${border}` }}
+            className="gap-1.5 text-xs hidden sm:flex"
           >
-            <Printer className="h-3.5 w-3.5 mr-1" /> Imprimir
+            <Printer className="h-3.5 w-3.5" /> Imprimir
           </Button>
         </div>
       </div>
 
-      {/* ── Painel de configuração ── */}
+      {/* ── Painel de configuração ───────────────────────────────────────────── */}
       {showConfig && (
-        <Card className="mb-6 p-5 print:hidden" style={{ background: cardBg, border: `1px solid ${primaryBlue}40` }}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-white flex items-center gap-2">
-              <Settings2 className="h-4 w-4" style={{ color: primaryBlue }} />
-              Configurações de Disponibilidade
-            </h3>
-            <button onClick={() => setShowConfig(false)}>
-              <X className="h-4 w-4" style={{ color: muted }} />
-            </button>
-          </div>
+        <div className="border-b border-border bg-card px-4 py-4 print:hidden">
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                <Settings2 className="h-4 w-4 text-primary" />
+                Configurações de Disponibilidade
+              </h3>
+              <button onClick={() => setShowConfig(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-          {/* Horário de início */}
-          <div className="mb-5">
-            <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: muted }}>
-              Horário de início dos estudos
-            </label>
-            <input
-              type="time" value={startTime}
-              onChange={e => setStartTime(e.target.value)}
-              className="px-3 py-2 rounded-lg text-white text-sm outline-none"
-              style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}
-            />
-            <p className="text-xs mt-1" style={{ color: muted }}>
-              Os blocos de estudo serão distribuídos a partir deste horário nos dias disponíveis.
-            </p>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Horário de início */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+                  Horário de início dos estudos
+                </label>
+                <input
+                  type="time" value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  className="px-3 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground w-full"
+                />
+                <p className="text-xs mt-1 text-muted-foreground">
+                  Os blocos serão distribuídos a partir deste horário.
+                </p>
+              </div>
 
-          {/* Grade de aulas */}
-          <div className="mb-5">
-            <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: muted }}>
-              Horários de Aula <span className="normal-case font-normal">(opcional)</span>
-            </label>
-            <p className="text-xs mb-3" style={{ color: muted }}>
-              Se você assiste aulas, informe aqui. O algoritmo priorizará essas disciplinas no mesmo dia para aproveitar a memória fresca.
-            </p>
+              {/* Adicionar aula */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+                  Horários de Aula <span className="normal-case font-normal">(opcional)</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <select value={newClass.dayId}
+                    onChange={e => setNewClass(p => ({ ...p, dayId: e.target.value }))}
+                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground col-span-2 sm:col-span-1">
+                    {DAY_IDS.map((d, i) => <option key={d} value={d}>{DAY_NAMES[i]}</option>)}
+                  </select>
+                  <select value={newClass.subjectId}
+                    onChange={e => setNewClass(p => ({ ...p, subjectId: e.target.value }))}
+                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground col-span-2 sm:col-span-1">
+                    <option value="">Disciplina...</option>
+                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <input type="time" value={newClass.startTime}
+                    onChange={e => setNewClass(p => ({ ...p, startTime: e.target.value }))}
+                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground" />
+                  <input type="time" value={newClass.endTime}
+                    onChange={e => setNewClass(p => ({ ...p, endTime: e.target.value }))}
+                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground" />
+                </div>
+                <Button size="sm" onClick={handleAddClass} className="gap-1.5 text-xs">
+                  <Plus className="h-3.5 w-3.5" /> Adicionar Aula
+                </Button>
+              </div>
+            </div>
 
+            {/* Lista de aulas */}
             {classes.length > 0 && (
-              <div className="space-y-2 mb-3">
+              <div className="mt-4 space-y-1.5">
                 {classes.map(c => {
                   const sub = subjects.find(s => s.id === c.subjectId);
                   return (
-                    <div key={c.id} className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                      style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}>
+                    <div key={c.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border">
                       <div className="w-2 h-2 rounded-full flex-shrink-0"
                         style={{ background: getSubjectColor(sub?.name || '', sub?.color) }} />
-                      <span className="text-sm text-white flex-1">
-                        {DAY_SHORT[DAY_MAP[c.dayId]]} · {c.startTime}–{c.endTime} · {sub?.name || '—'}
+                      <span className="text-sm text-foreground flex-1">
+                        {DAY_NAMES[DAY_IDS.indexOf(c.dayId)]} · {c.startTime}–{c.endTime} · {sub?.name || '—'}
                       </span>
-                      <button onClick={() => setClasses(prev => prev.filter(x => x.id !== c.id))}>
-                        <Trash2 className="h-3.5 w-3.5" style={{ color: muted }} />
+                      <button onClick={() => setClasses(prev => prev.filter(x => x.id !== c.id))}
+                        className="text-muted-foreground hover:text-destructive transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   );
@@ -384,271 +437,210 @@ const Planning: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <select value={newClass.dayId}
-                onChange={e => setNewClass(p => ({ ...p, dayId: e.target.value }))}
-                className="px-2 py-2 rounded-lg text-white text-sm outline-none"
-                style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}>
-                {DAY_IDS.map((d, i) => <option key={d} value={d}>{DAY_SHORT[i]}</option>)}
-              </select>
-              <input type="time" value={newClass.startTime}
-                onChange={e => setNewClass(p => ({ ...p, startTime: e.target.value }))}
-                className="px-2 py-2 rounded-lg text-white text-sm outline-none"
-                style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
-              <input type="time" value={newClass.endTime}
-                onChange={e => setNewClass(p => ({ ...p, endTime: e.target.value }))}
-                className="px-2 py-2 rounded-lg text-white text-sm outline-none"
-                style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
-              <select value={newClass.subjectId}
-                onChange={e => setNewClass(p => ({ ...p, subjectId: e.target.value }))}
-                className="px-2 py-2 rounded-lg text-white text-sm outline-none"
-                style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}>
-                <option value="">Disciplina...</option>
-                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            <Button size="sm" className="mt-2" onClick={handleAddClass}
-              style={{ background: primaryGradient, color: 'white', border: 'none' }}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Aula
+            <Button onClick={handleSaveConfig} className="mt-4">
+              Salvar e Atualizar Plano
             </Button>
           </div>
-
-          <Button onClick={handleSaveConfig} style={{ background: primaryGradient, color: 'white', border: 'none' }}>
-            Salvar e Atualizar Plano
-          </Button>
-        </Card>
+        </div>
       )}
 
-      {/* ── Aviso sem onboarding ── */}
+      {/* ── Aviso sem onboarding ─────────────────────────────────────────────── */}
       {!userProfile?.onboarding_data && (
-        <Card className="mb-5 p-4 flex items-center gap-3 print:hidden"
-          style={{ background: 'hsl(35 90% 55% / 0.1)', border: '1px solid hsl(35 90% 55% / 0.3)' }}>
-          <AlertCircle className="h-4 w-4 flex-shrink-0" style={{ color: 'hsl(35 90% 65%)' }} />
-          <p className="text-sm" style={{ color: 'hsl(35 90% 65%)' }}>
-            Usando configuração padrão (1–2h/dia, Seg–Sex). Configure sua disponibilidade clicando em <strong>Configurar</strong>.
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 print:hidden">
+          <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Usando configuração padrão (1–2h/dia, Seg–Sex). Clique em <strong>Configurar</strong> para personalizar.
           </p>
-        </Card>
+        </div>
       )}
 
-      {/* ── KPIs ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 print:grid-cols-4">
-        {[
-          { icon: CalendarDays, label: 'Dias ativos', value: activeDays.length },
-          { icon: Clock, label: 'Horas/semana', value: minutesToHM(stats.totalMin) },
-          { icon: BookOpen, label: 'Sessões', value: stats.sessions },
-          { icon: Brain, label: 'Disciplinas', value: Object.keys(stats.subjectMin).length },
-        ].map(({ icon: Icon, label, value }) => (
-          <Card key={label} className="p-4" style={{ background: cardBg, border: `1px solid ${border}` }}>
-            <div className="flex items-center gap-2 mb-1">
-              <Icon className="h-3.5 w-3.5" style={{ color: primaryBlue }} />
-              <span className="text-xs" style={{ color: muted }}>{label}</span>
-            </div>
-            <p className="text-xl font-bold text-white">{value}</p>
-          </Card>
-        ))}
-      </div>
-
-      {/* ── Distribuição por disciplina ── */}
-      {Object.keys(stats.subjectMin).length > 0 && (
-        <Card className="mb-6 p-4" style={{ background: cardBg, border: `1px solid ${border}` }}>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: muted }}>
-            Distribuição semanal por disciplina
-          </p>
-          <div className="space-y-2">
-            {Object.entries(stats.subjectMin)
-              .sort((a, b) => b[1] - a[1])
-              .map(([name, min]) => {
-                const sub = subjects.find(s => s.name === name);
-                const color = getSubjectColor(name, sub?.color);
-                const pct = Math.round((min / stats.totalMin) * 100);
-                return (
-                  <div key={name}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-                        <span className="text-xs text-white">{name}</span>
-                      </div>
-                      <span className="text-xs font-medium" style={{ color }}>
-                        {minutesToHM(min)} · {pct}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(222 47% 14%)' }}>
-                      <div className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, background: color }} />
-                    </div>
+      {/* ── Grade do Calendário ──────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto">
+        <div className="min-w-[640px]">
+          {/* Cabeçalho com dias */}
+          <div className="flex border-b border-border bg-card sticky top-0 z-10">
+            {/* Coluna de horas */}
+            <div className="w-14 flex-shrink-0" />
+            {/* Colunas dos dias */}
+            {weekDates.map((date, colIdx) => {
+              const jsDay = date.getDay();
+              const isToday = isCurrentWeek && jsDay === todayJs;
+              const dayHasBlocks = Object.entries(planByDay).some(([d]) => {
+                // planByDay usa jsDay como chave
+                return parseInt(d) === jsDay && planByDay[parseInt(d)]?.length > 0;
+              });
+              return (
+                <div key={colIdx}
+                  className={`flex-1 text-center py-3 border-l border-border ${isToday ? 'bg-primary/5' : ''}`}>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    {DAY_SHORT[colIdx]}
+                  </p>
+                  <div className={`mx-auto mt-1 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                    isToday
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-foreground'
+                  }`}>
+                    {date.getDate()}
                   </div>
-                );
-              })}
+                  {dayHasBlocks && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mx-auto mt-1" />
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </Card>
-      )}
 
-      {/* ── Grade semanal ── */}
-      <div className="space-y-4">
-        {activeDays.map(day => {
-          const blocks = planByDay[day] || [];
-          const dayTotalMin = blocks.reduce((s, b) => s + b.duration, 0);
-          const hasClass = classes.some(c => DAY_MAP[c.dayId] === day);
-
-          return (
-            <Card key={day} style={{ background: cardBg, border: `1px solid ${border}` }}>
-              {/* Cabeçalho do dia */}
-              <div className="flex items-center justify-between px-4 py-3"
-                style={{ borderBottom: `1px solid ${border}` }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-                    style={{ background: primaryGradient }}>
-                    {DAY_SHORT[day]}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white text-sm">{DAY_NAMES[day]}</p>
-                    <p className="text-xs" style={{ color: muted }}>
-                      {blocks.length} sessões · {minutesToHM(dayTotalMin)}
-                      {hasClass && (
-                        <span className="ml-2" style={{ color: 'hsl(45 90% 60%)' }}>· Dia de aula</span>
-                      )}
-                    </p>
-                  </div>
+          {/* Grade de horas */}
+          <div className="flex">
+            {/* Coluna de horas */}
+            <div className="w-14 flex-shrink-0 relative">
+              {HOURS.map(h => (
+                <div key={h} style={{ height: CELL_HEIGHT }}
+                  className="border-b border-border/40 flex items-start justify-end pr-2 pt-1">
+                  <span className="text-[10px] text-muted-foreground/60 font-medium">
+                    {String(h).padStart(2, '0')}:00
+                  </span>
                 </div>
-                <button
-                  onClick={() => handleRegenerateDay(day)}
-                  className="print:hidden flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
-                  style={{ color: muted, border: `1px solid ${border}` }}
-                  title="Regenerar este dia"
+              ))}
+            </div>
+
+            {/* Colunas dos dias */}
+            {weekDates.map((date, colIdx) => {
+              const jsDay = date.getDay();
+              const isToday = isCurrentWeek && jsDay === todayJs;
+              const blocks = planByDay[jsDay] || [];
+              const totalHours = HOURS.length;
+
+              return (
+                <div key={colIdx}
+                  className={`flex-1 border-l border-border relative ${isToday ? 'bg-primary/[0.02]' : ''}`}
+                  style={{ height: totalHours * CELL_HEIGHT }}
                 >
-                  <RefreshCw className="h-3 w-3" />
-                </button>
-              </div>
+                  {/* Linhas de hora */}
+                  {HOURS.map(h => (
+                    <div key={h}
+                      className="absolute w-full border-b border-border/30"
+                      style={{ top: (h - HOUR_START) * CELL_HEIGHT, height: CELL_HEIGHT }}
+                    />
+                  ))}
 
-              {/* Blocos */}
-              {blocks.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm" style={{ color: muted }}>
-                  Nenhuma sessão gerada para este dia.
-                </div>
-              ) : (
-                <div className="divide-y" style={{ borderColor: 'hsl(222 47% 12%)' }}>
+                  {/* Linha do horário atual (só hoje) */}
+                  {isToday && (() => {
+                    const now = new Date();
+                    const nowMin = now.getHours() * 60 + now.getMinutes();
+                    const topPx = (nowMin - HOUR_START * 60) * (CELL_HEIGHT / 60);
+                    if (topPx < 0 || topPx > totalHours * CELL_HEIGHT) return null;
+                    return (
+                      <div className="absolute w-full z-20 pointer-events-none"
+                        style={{ top: topPx }}>
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 -ml-1" />
+                          <div className="flex-1 h-px bg-primary" />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Blocos de estudo */}
                   {blocks.map(block => {
-                    const subjectColor = getSubjectColor(block.subjectName,
+                    const color = getSubjectColor(block.subjectName,
                       subjects.find(s => s.id === block.subjectId)?.color);
-                    const typeColor = SESSION_TYPE_COLORS[block.type] || primaryBlue;
-                    const isEditing = editingBlock === block.uid;
+                    const typeColor = SESSION_TYPE_COLORS[block.type] || color;
+                    const isSelected = selectedBlock === block.uid;
 
                     return (
-                      <div key={block.uid}
-                        className="px-4 py-3 flex items-start gap-3 group relative">
-                        {/* Barra lateral de cor */}
-                        <div className="w-1 self-stretch rounded-full flex-shrink-0 mt-0.5"
-                          style={{ background: subjectColor }} />
-
-                        {/* Horário */}
-                        <div className="text-center flex-shrink-0 w-12">
-                          <p className="text-xs font-bold text-white">{block.startTime}</p>
-                          <p className="text-[10px]" style={{ color: muted }}>{block.endTime}</p>
-                        </div>
-
-                        {/* Conteúdo */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-white">{block.subjectName}</span>
-                            {block.classHint && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                                style={{ background: 'hsl(45 90% 55% / 0.15)', color: 'hsl(45 90% 65%)' }}>
-                                ★ Pós-aula
-                              </span>
+                      <div
+                        key={block.uid}
+                        onClick={() => setSelectedBlock(isSelected ? null : block.uid)}
+                        className="absolute left-0.5 right-0.5 rounded-md cursor-pointer overflow-hidden transition-all duration-150 hover:z-30 hover:shadow-lg"
+                        style={{
+                          top: block.topPx,
+                          height: block.heightPx,
+                          background: `${color}22`,
+                          borderLeft: `3px solid ${color}`,
+                          zIndex: isSelected ? 30 : 10,
+                          outline: isSelected ? `2px solid ${color}` : 'none',
+                          outlineOffset: '1px',
+                        }}
+                      >
+                        <div className="px-1.5 py-1 h-full flex flex-col justify-between overflow-hidden">
+                          <div>
+                            <p className="text-[11px] font-semibold leading-tight truncate"
+                              style={{ color }}>
+                              {block.subjectName}
+                            </p>
+                            {block.heightPx > 40 && (
+                              <p className="text-[10px] leading-tight truncate text-muted-foreground mt-0.5">
+                                {SESSION_TYPE_LABELS[block.type] || block.type}
+                              </p>
                             )}
-                            <Badge className="text-[10px] px-1.5 py-0 h-4"
-                              style={{ background: `${typeColor}20`, color: typeColor, border: `1px solid ${typeColor}40` }}>
-                              {SESSION_TYPE_LABELS[block.type] || block.type}
-                            </Badge>
-                            <span className="text-xs" style={{ color: muted }}>{block.duration}min</span>
+                            {block.heightPx > 55 && block.topics && block.topics.length > 0 && (
+                              <p className="text-[9px] leading-tight truncate mt-0.5"
+                                style={{ color: typeColor, opacity: 0.8 }}>
+                                {block.topics[0]}
+                              </p>
+                            )}
                           </div>
-                          {block.topics && block.topics.length > 0 && (
-                            <p className="text-xs mt-1 truncate" style={{ color: muted }}>
-                              {block.topics.slice(0, 2).join(' · ')}
-                              {block.topics.length > 2 && ` +${block.topics.length - 2}`}
+                          {block.heightPx > 32 && (
+                            <p className="text-[9px] text-muted-foreground/70">
+                              {block.startTime}–{block.endTime}
                             </p>
                           )}
+                        </div>
 
-                          {/* Seletor de troca */}
-                          {isEditing && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
+                        {/* Popup de edição ao selecionar */}
+                        {isSelected && (
+                          <div
+                            className="absolute left-0 top-full mt-1 z-50 rounded-xl shadow-xl border border-border bg-popover p-3 min-w-[200px]"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <p className="text-xs font-semibold text-foreground mb-1">{block.subjectName}</p>
+                            <p className="text-[10px] text-muted-foreground mb-2">
+                              {block.startTime}–{block.endTime} · {block.duration}min
+                            </p>
+                            {block.topics && block.topics.length > 0 && (
+                              <p className="text-[10px] text-muted-foreground mb-2 italic">
+                                {block.topics.slice(0, 2).join(', ')}
+                              </p>
+                            )}
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                              Trocar disciplina
+                            </p>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
                               {subjects.map(s => (
                                 <button key={s.id}
                                   onClick={() => handleSwapSubject(block.uid, s.id)}
-                                  className="text-xs px-2 py-1 rounded-lg transition-all"
-                                  style={{
-                                    background: s.id === block.subjectId
-                                      ? `${getSubjectColor(s.name, s.color)}30` : 'hsl(222 47% 14%)',
-                                    border: `1px solid ${s.id === block.subjectId
-                                      ? getSubjectColor(s.name, s.color) : border}`,
-                                    color: s.id === block.subjectId
-                                      ? getSubjectColor(s.name, s.color) : muted,
-                                  }}>
+                                  className="w-full text-left text-xs px-2 py-1 rounded-lg hover:bg-accent transition-colors flex items-center gap-2"
+                                >
+                                  <div className="w-2 h-2 rounded-full flex-shrink-0"
+                                    style={{ background: getSubjectColor(s.name, s.color) }} />
                                   {s.name}
                                 </button>
                               ))}
-                              <button onClick={() => setEditingBlock(null)}
-                                className="text-xs px-2 py-1 rounded-lg"
-                                style={{ border: `1px solid ${border}`, color: muted }}>
-                                Cancelar
-                              </button>
                             </div>
-                          )}
-                        </div>
-
-                        {/* Ações hover */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity print:hidden flex-shrink-0">
-                          <button onClick={() => setEditingBlock(isEditing ? null : block.uid)}
-                            className="p-1 rounded" style={{ color: muted }} title="Trocar disciplina">
-                            <RefreshCw className="h-3.5 w-3.5" />
-                          </button>
-                          <button onClick={() => handleRemoveBlock(block.uid)}
-                            className="p-1 rounded" style={{ color: muted }} title="Remover bloco">
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                            <button
+                              onClick={() => handleRemoveBlock(block.uid)}
+                              className="mt-2 w-full text-xs text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors flex items-center gap-1.5"
+                            >
+                              <Trash2 className="h-3 w-3" /> Remover bloco
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              )}
-            </Card>
-          );
-        })}
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* ── Recomendações ── */}
-      {cycleResult?.recommendations && cycleResult.recommendations.length > 0 && (
-        <Card className="mt-6 p-4 print:mt-4" style={{ background: cardBg, border: `1px solid ${border}` }}>
-          <div className="flex items-center gap-2 mb-3">
-            <Zap className="h-4 w-4" style={{ color: primaryBlue }} />
-            <p className="text-sm font-semibold text-white">Recomendações do Algoritmo</p>
-          </div>
-          <ul className="space-y-1.5">
-            {cycleResult.recommendations.slice(0, 4).map((r, i) => (
-              <li key={i} className="text-xs flex items-start gap-2" style={{ color: muted }}>
-                <span style={{ color: primaryBlue }}>›</span> {r}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {/* ── Legenda ── */}
-      <div className="mt-6 flex flex-wrap gap-3 print:mt-4">
-        {Object.entries(SESSION_TYPE_LABELS).map(([type, label]) => (
-          <div key={type} className="flex items-center gap-1.5 text-xs" style={{ color: muted }}>
-            <div className="w-2 h-2 rounded-full" style={{ background: SESSION_TYPE_COLORS[type] }} />
-            {label}
-          </div>
-        ))}
-      </div>
-
+      {/* ── Print styles ─────────────────────────────────────────────────────── */}
       <style>{`
         @media print {
-          body { background: white !important; color: black !important; }
           .print\\:hidden { display: none !important; }
-          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { background: white; }
         }
       `}</style>
     </div>

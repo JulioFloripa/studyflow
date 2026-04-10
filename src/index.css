@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Tema Escuro (padrão) ── */
   :root {
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
@@ -54,6 +55,55 @@
     --shadow-2xl: 0 25px 50px -12px hsl(0 0% 0% / 0.6);
     --tracking-normal: 0em;
     --spacing: 0.25rem;
+  }
+
+  /* ── Tema Claro ── */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 98%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 94%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 16% 45%;
+    --accent: 210 20% 92%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 88%;
+    --input: 214 20% 94%;
+    --ring: 217 91% 50%;
+    --success: 142 71% 38%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 38 80% 12%;
+    --chart-1: 217 91% 50%;
+    --chart-2: 142 71% 38%;
+    --chart-3: 262 83% 52%;
+    --chart-4: 38 92% 45%;
+    --chart-5: 0 72% 51%;
+    --sidebar-background: 210 20% 97%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 92%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 20% 88%;
+    --sidebar-ring: 217 91% 50%;
+    --sidebar: 210 20% 97%;
+    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.08);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.08);
+    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -2px hsl(0 0% 0% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 10px 10px -5px hsl(0 0% 0% / 0.1);
+    --shadow-2xl: 0 25px 50px -12px hsl(0 0% 0% / 0.15);
   }
 }
 
