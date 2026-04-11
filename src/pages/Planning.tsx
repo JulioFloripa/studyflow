@@ -50,6 +50,29 @@ const SESSION_TYPE_COLORS: Record<string, string> = {
   practice:         '#f59e0b',
 };
 
+// Converte hex para RGB e calcula luminância para decidir cor do texto
+function hexToRgb(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r, g, b];
+}
+
+function getLuminance(hex: string): number {
+  if (!hex.startsWith('#') || hex.length < 7) return 0.5;
+  const [r, g, b] = hexToRgb(hex).map(c => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// Retorna cor de texto com contraste garantido sobre o fundo do bloco
+function getTextColorForBg(bgHex: string): string {
+  const lum = getLuminance(bgHex);
+  return lum > 0.35 ? '#1e293b' : '#ffffff';
+}
+
 // ─── Utilitários ──────────────────────────────────────────────────────────────
 function getSubjectColor(name: string, fallback?: string): string {
   if (fallback) return fallback;
@@ -556,39 +579,46 @@ const Planning: React.FC = () => {
                         style={{
                           top: block.topPx,
                           height: block.heightPx,
-                          background: `${color}22`,
+                          background: color,
                           borderLeft: `3px solid ${color}`,
+                          filter: 'brightness(0.85) saturate(1.1)',
                           zIndex: isSelected ? 30 : 10,
                           outline: isSelected ? `2px solid ${color}` : 'none',
                           outlineOffset: '1px',
                         }}
                       >
+                        {(() => {
+                          const textColor = getTextColorForBg(color);
+                          return (
                         <div className="px-1.5 py-1 h-full flex flex-col justify-between overflow-hidden">
                           <div>
                             <p className="text-[11px] font-semibold leading-tight truncate"
-                              style={{ color }}>
+                              style={{ color: textColor }}>
                               {block.subjectName}
                             </p>
                             {block.heightPx > 40 && (
-                              <p className="text-[10px] leading-tight truncate text-muted-foreground mt-0.5">
+                              <p className="text-[10px] leading-tight truncate mt-0.5"
+                                style={{ color: textColor, opacity: 0.85 }}>
                                 {SESSION_TYPE_LABELS[block.type] || block.type}
                               </p>
                             )}
                             {block.heightPx > 55 && block.topics && block.topics.length > 0 && (
                               <p className="text-[9px] leading-tight truncate mt-0.5"
-                                style={{ color: typeColor, opacity: 0.8 }}>
+                                style={{ color: textColor, opacity: 0.75 }}>
                                 {block.topics[0]}
                               </p>
                             )}
                           </div>
                           {block.heightPx > 32 && (
-                            <p className="text-[9px] text-muted-foreground/70">
+                            <p className="text-[9px]" style={{ color: textColor, opacity: 0.8 }}>
                               {block.startTime}–{block.endTime}
                             </p>
                           )}
                         </div>
+                          );
+                        })()}
 
-                        {/* Popup de edição ao selecionar */}
+                        {/* Popup de edição ao selecionar — FECHAMENTO do bloco acima */}
                         {isSelected && (
                           <div
                             className="absolute left-0 top-full mt-1 z-50 rounded-xl shadow-xl border border-border bg-popover p-3 min-w-[200px]"
