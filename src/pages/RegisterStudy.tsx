@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStudy } from '@/contexts/StudyContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,10 +20,23 @@ const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 6
 
 const RegisterStudy = () => {
   const { subjects, topics, addStudySession } = useStudy();
+  const location = useLocation();
   const [sessionType, setSessionType] = useState<SessionType>('study');
   const [classMode, setClassMode] = useState<ClassMode>('presencial');
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
+
+  // Pré-preenche quando vem do botão "Iniciar Estudo" do Dashboard
+  useEffect(() => {
+    const state = location.state as { suggestedTopicId?: string } | null;
+    if (state?.suggestedTopicId) {
+      const topic = topics.find(t => t.id === state.suggestedTopicId);
+      if (topic) {
+        setSubjectId(topic.subjectId);
+        setTopicId(topic.id);
+      }
+    }
+  }, [location.state, topics]);
   const [minutes, setMinutes] = useState('');
   const [questionsTotal, setQuestionsTotal] = useState('');
   const [questionsCorrect, setQuestionsCorrect] = useState('');
@@ -80,6 +94,17 @@ const RegisterStudy = () => {
           Registre um estudo autônomo ou uma aula — ambos geram revisões automáticas
         </p>
       </div>
+
+      {/* Banner quando vem pré-preenchido do Dashboard */}
+      {(location.state as any)?.suggestedTopicId && !saved && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
+          style={{ background: 'hsl(217 91% 60% / 0.1)', border: '1px solid hsl(217 91% 60% / 0.3)' }}>
+          <span className="text-base">⚡</span>
+          <p style={{ color: 'hsl(217 91% 75%)' }}>
+            Formulário pré-preenchido com a sugestão do Dashboard. Ajuste se necessário.
+          </p>
+        </div>
+      )}
 
       {saved ? (
         <Card className="p-12 text-center" style={{ background: cardBg, border: `1px solid ${border}` }}>
