@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useStudy } from '@/contexts/StudyContext';
 import { Card } from '@/components/ui/card';
@@ -27,13 +27,20 @@ const RegisterStudy = () => {
   const [topicId, setTopicId] = useState('');
 
   // Pré-preenche quando vem do botão "Iniciar Estudo" do Dashboard
+  // Usa uma ref para evitar sobrescrever após o usuário editar manualmente
+  const prefillApplied = React.useRef(false);
   useEffect(() => {
+    if (prefillApplied.current) return; // já aplicou, não sobrescreve
     const state = location.state as { suggestedTopicId?: string } | null;
-    if (state?.suggestedTopicId) {
+    if (state?.suggestedTopicId && topics.length > 0) {
       const topic = topics.find(t => t.id === state.suggestedTopicId);
       if (topic) {
         setSubjectId(topic.subjectId);
-        setTopicId(topic.id);
+        // Aguarda o React re-renderizar com o subjectId antes de setar o topicId
+        setTimeout(() => {
+          setTopicId(topic.id);
+          prefillApplied.current = true;
+        }, 50);
       }
     }
   }, [location.state, topics]);
