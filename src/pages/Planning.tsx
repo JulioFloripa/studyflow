@@ -1,47 +1,85 @@
 /**
- * Planning.tsx — Calendário Semanal Inteligente (estilo Google Calendar)
+ * Planning.tsx — Plano de Estudos Inteligente
  *
- * Layout: grade de horários (linhas = horas, colunas = Seg–Dom)
- * Navegação: avançar/recuar semanas com datas reais
- * Blocos: gerados pelo cycleGeneratorV2 + posicionados na grade por horário
+ * Relatório semanal gerado pelo algoritmo com base nas aulas cadastradas
+ * na Agenda Semanal + horas disponíveis do onboarding.
+ *
+ * Layout imprimível em A4 para o estudante colar na parede ou agenda.
  */
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useMemo } from 'react';
 import {
-  ChevronLeft, ChevronRight, RefreshCw, Settings2, X,
-  Printer, CalendarDays, AlertCircle, Plus, Trash2,
+  ChevronLeft, ChevronRight, Printer, RefreshCw,
+  BookOpen, Clock, BarChart2, Zap, CheckCircle, AlertTriangle,
+  Star, RotateCcw, Target, TrendingUp,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useStudy } from '@/contexts/StudyContext';
 import { generateStudentCycle, extractDifficultyTopics } from '@/lib/cycleAdapter';
 import { formatCycleForWeek, CycleSlot } from '@/lib/cycleGeneratorV2';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-const DAY_NAMES  = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
-const DAY_SHORT  = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-// Mapeamento: índice 0=Seg…6=Dom → dia da semana JS (1=Seg…0=Dom)
-const DAY_JS     = [1, 2, 3, 4, 5, 6, 0];
-const DAY_IDS    = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
-const DAY_MAP: Record<string, number> = { seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6, dom: 0 };
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const DAY_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const STORAGE_KEY_CLASSES = 'ws_classes_v2';
 
-// Horas exibidas na grade (06:00 – 23:00)
-const HOUR_START = 6;
-const HOUR_END   = 23;
-const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
+function getMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d); r.setDate(r.getDate() + n); return r;
+}
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+function fmtDateFull(d: Date): string {
+  return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+}
+function fmtHours(min: number): string {
+  const h = Math.floor(min / 60); const m = min % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${m.toString().padStart(2, '0')}`;
+}
+function timeToMin(t: string): number {
+  const [h, m] = t.split(':').map(Number); return h * 60 + m;
+}
 
-const SESSION_TYPE_LABELS: Record<string, string> = {
+// Aulas salvas pela Agenda Semanal
+interface ClassEntry {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  subjectId: string;
+  repeats: boolean;
+}
+function loadClasses(): ClassEntry[] {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY_CLASSES) || '[]'); } catch { return []; }
+}
+
+const SESSION_ICONS: Record<string, React.ReactNode> = {
+  immediate_review: <RotateCcw size={12} />,
+  spaced_review:    <RefreshCw size={12} />,
+  difficulty_review:<AlertTriangle size={12} />,
+  deep_study:       <Zap size={12} />,
+  syllabus_week:    <BookOpen size={12} />,
+  practice:         <Star size={12} />,
+};
+const SESSION_LABELS: Record<string, string> = {
   immediate_review: 'Revisão Imediata',
   spaced_review:    'Revisão Espaçada',
   difficulty_review:'Reforço',
   deep_study:       'Estudo Profundo',
-  syllabus_week:    'Conteúdo',
+  syllabus_week:    'Conteúdo Novo',
   practice:         'Exercícios',
 };
-
-const SESSION_TYPE_COLORS: Record<string, string> = {
+const SESSION_COLORS: Record<string, string> = {
   immediate_review: '#10b981',
   spaced_review:    '#a855f7',
   difficulty_review:'#f97316',
@@ -50,143 +88,97 @@ const SESSION_TYPE_COLORS: Record<string, string> = {
   practice:         '#f59e0b',
 };
 
-// Converte hex para RGB e calcula luminância para decidir cor do texto
-function hexToRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1,3),16);
-  const g = parseInt(hex.slice(3,5),16);
-  const b = parseInt(hex.slice(5,7),16);
-  return [r, g, b];
-}
+// ─── Componente de bloco de estudo ────────────────────────────────────────────
+const StudyBlock: React.FC<{ slot: CycleSlot; isPostClass?: boolean }> = ({ slot, isPostClass }) => {
+  const color = slot.color || SESSION_COLORS[slot.type] || '#6366f1';
+  const label = SESSION_LABELS[slot.type] || slot.type;
+  const icon  = SESSION_ICONS[slot.type] || <BookOpen size={12} />;
 
-function getLuminance(hex: string): number {
-  if (!hex.startsWith('#') || hex.length < 7) return 0.5;
-  const [r, g, b] = hexToRgb(hex).map(c => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-// Retorna cor de texto com contraste garantido sobre o fundo do bloco
-function getTextColorForBg(bgHex: string): string {
-  const lum = getLuminance(bgHex);
-  return lum > 0.35 ? '#1e293b' : '#ffffff';
-}
-
-// ─── Utilitários ──────────────────────────────────────────────────────────────
-function getSubjectColor(name: string, fallback?: string): string {
-  if (fallback) return fallback;
-  const map: [string, string][] = [
-    ['Matem', '#3b82f6'], ['Física', '#a855f7'], ['Quím', '#10b981'],
-    ['Biolog', '#059669'], ['Portugu', '#f59e0b'], ['Histór', '#f97316'],
-    ['Geograf', '#06b6d4'], ['Filosofia', '#8b5cf6'], ['Inglês', '#eab308'],
-    ['Espanhol', '#eab308'], ['Redação', '#ec4899'],
-  ];
-  for (const [k, v] of map) if (name.includes(k)) return v;
-  const h = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return `hsl(${h % 360} 70% 55%)`;
-}
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function minutesToHM(m: number): string {
-  const h = Math.floor(m / 60), min = m % 60;
-  return h > 0 ? `${h}h${min > 0 ? `${min}` : ''}` : `${min}min`;
-}
-
-/** Retorna a Segunda-feira da semana que contém `date` */
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Dom
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-}
-
-function formatMonthYear(date: Date): string {
-  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-}
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-interface ClassEntry {
-  id: string; dayId: string; startTime: string; endTime: string; subjectId: string;
-}
-
-interface PlanBlock extends CycleSlot {
-  uid: string; classHint?: boolean;
-  // posição na grade em pixels
-  topPx: number; heightPx: number;
-}
-
-const CELL_HEIGHT = 60; // px por hora
+  return (
+    <div
+      className="rounded-lg p-3 mb-2 relative overflow-hidden"
+      style={{
+        background: color + '15',
+        borderLeft: `3px solid ${color}`,
+        border: `1px solid ${color}30`,
+      }}
+    >
+      {isPostClass && (
+        <span
+          className="absolute top-1.5 right-1.5 text-xs px-1.5 py-0.5 rounded font-semibold"
+          style={{ background: '#f59e0b20', color: '#f59e0b', fontSize: '10px' }}
+        >
+          ★ Pós-aula
+        </span>
+      )}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <span className="font-bold text-sm truncate pr-12" style={{ color }}>
+          {slot.subjectName}
+        </span>
+      </div>
+      <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+        <span className="flex items-center gap-1">{icon} {label}</span>
+        <span className="flex items-center gap-1"><Clock size={10} /> {fmtHours(slot.duration)}</span>
+        <span>{slot.startTime}</span>
+      </div>
+      {slot.topics && slot.topics.length > 0 && (
+        <div className="mt-2 space-y-0.5">
+          {slot.topics.slice(0, 2).map((t, i) => (
+            <div key={i} className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+              • {t}
+            </div>
+          ))}
+          {slot.topics.length > 2 && (
+            <div className="text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+              +{slot.topics.length - 2} tópicos
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const Planning: React.FC = () => {
   const { user } = useAuth();
   const { subjects, topics, studySessions, userProfile, loading } = useStudy();
 
-  // ── Semana atual ────────────────────────────────────────────────────────────
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = semana atual
-  const monday = useMemo(() => {
-    const base = getMonday(new Date());
-    return addDays(base, weekOffset * 7);
-  }, [weekOffset]);
-
-  const weekDates = useMemo(() =>
-    Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
-
-  const isCurrentWeek = weekOffset === 0;
-  const todayJs = new Date().getDay(); // 0=Dom
-
-  // ── Configuração ────────────────────────────────────────────────────────────
-  const [showConfig, setShowConfig] = useState(false);
-  const [startTime, setStartTime] = useState<string>(() =>
-    localStorage.getItem('plan_startTime') || '08:00');
-  const [classes, setClasses] = useState<ClassEntry[]>(() => {
-    try { return JSON.parse(localStorage.getItem('plan_classes') || '[]'); } catch { return []; }
-  });
-  const [newClass, setNewClass] = useState<Omit<ClassEntry, 'id'>>({
-    dayId: 'seg', startTime: '07:00', endTime: '08:30', subjectId: '',
-  });
-
-  // ── Plano editável ──────────────────────────────────────────────────────────
-  const [editOverrides, setEditOverrides] = useState<Record<string, string | null>>({});
+  const [weekOffset, setWeekOffset] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
 
-  useEffect(() => { localStorage.setItem('plan_startTime', startTime); }, [startTime]);
-  useEffect(() => { localStorage.setItem('plan_classes', JSON.stringify(classes)); }, [classes]);
+  const monday = useMemo(() => addDays(getMonday(new Date()), weekOffset * 7), [weekOffset]);
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
+  const isCurrentWeek = weekOffset === 0;
+  const todayDow = new Date().getDay();
 
-  // ── Dados derivados ─────────────────────────────────────────────────────────
+  // Carregar aulas da Agenda Semanal
+  const classes = useMemo(() => loadClasses(), []);
+
+  // Construir hint de disciplinas por dia (aulas cadastradas)
+  const classDaySubjects = useMemo(() => {
+    const map: Record<number, Set<string>> = {};
+    classes.forEach(c => {
+      if (!map[c.dayOfWeek]) map[c.dayOfWeek] = new Set();
+      map[c.dayOfWeek].add(c.subjectId);
+    });
+    return map;
+  }, [classes]);
+
+  // Dados do onboarding
   const onboarding = useMemo(() => {
     const od = userProfile?.onboarding_data as Record<string, unknown> | undefined;
+    const savedStart = (od?.studyStartTime as string) || localStorage.getItem('plan_startTime') || '08:00';
     return {
       dailyHours: (od?.dailyHours as string) || '1to2',
       studyDays: (od?.studyDays as string[]) || ['seg', 'ter', 'qua', 'qui', 'sex'],
-      studyStartTime: startTime,
+      studyStartTime: savedStart,
     };
-  }, [userProfile, startTime]);
+  }, [userProfile]);
 
   const topicsBySubject = useMemo(() => {
     const map: Record<string, string[]> = {};
-    for (const t of topics) {
-      if (!map[t.subjectId]) map[t.subjectId] = [];
-      map[t.subjectId].push(t.name);
-    }
+    topics.forEach(t => { if (!map[t.subjectId]) map[t.subjectId] = []; map[t.subjectId].push(t.name); });
     return map;
   }, [topics]);
 
@@ -199,116 +191,60 @@ const Planning: React.FC = () => {
       })), subjects
     ), [studySessions, topics, subjects]);
 
-  // ── Gerar ciclo ─────────────────────────────────────────────────────────────
+  // Gerar ciclo — eleva prioridade das disciplinas que têm aula
   const cycleResult = useMemo(() => {
     if (subjects.length === 0) return null;
     const subjectsWithHint = subjects.map(s => ({
-      ...s, priority: classes.some(c => c.subjectId === s.id) ? Math.min(s.priority + 1, 5) : s.priority,
+      ...s,
+      priority: Object.values(classDaySubjects).some(set => set.has(s.id))
+        ? Math.min((s.priority || 3) + 1, 5)
+        : (s.priority || 3),
     }));
-    return generateStudentCycle(
-      user?.id || 'anon',
-      userProfile?.full_name || 'Estudante',
-      onboarding, subjectsWithHint, topicsBySubject, difficultyTopics
-    );
+    try {
+      return generateStudentCycle(
+        user?.id || 'anon',
+        userProfile?.full_name || 'Estudante',
+        onboarding, subjectsWithHint, topicsBySubject, difficultyTopics
+      );
+    } catch { return null; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjects, onboarding, topicsBySubject, difficultyTopics, classes, refreshKey]);
+  }, [subjects, onboarding, topicsBySubject, difficultyTopics, classDaySubjects, refreshKey]);
 
-  // ── Formatar por dia da semana (0=Dom…6=Sáb) ───────────────────────────────
-  const weekByDay = useMemo(() => {
-    if (!cycleResult) return {} as Record<number, PlanBlock[]>;
-    let byDay: Record<number, CycleSlot[]>;
-    try { byDay = formatCycleForWeek(cycleResult); } catch { return {}; }
+  const byDay = useMemo(() => {
+    if (!cycleResult) return {} as Record<number, CycleSlot[]>;
+    try { return formatCycleForWeek(cycleResult); } catch { return {}; }
+  }, [cycleResult]);
 
-    const classDaySubjects: Record<number, Set<string>> = {};
-    classes.forEach(c => {
-      const d = DAY_MAP[c.dayId];
-      if (!classDaySubjects[d]) classDaySubjects[d] = new Set();
-      classDaySubjects[d].add(c.subjectId);
-    });
+  // Dias da semana com slots
+  const DAYS_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Seg → Dom
+  const activeDays = useMemo(() =>
+    DAYS_ORDER.filter(dow => (byDay[dow] ?? []).length > 0 || (classDaySubjects[dow]?.size ?? 0) > 0),
+    [byDay, classDaySubjects]
+  );
 
-    const result: Record<number, PlanBlock[]> = {};
-    Object.entries(byDay).forEach(([dayStr, slots]) => {
-      const day = parseInt(dayStr);
-      result[day] = (slots as CycleSlot[]).map((slot, i) => {
-        const startMin = timeToMinutes(slot.startTime);
-        const topPx = (startMin - HOUR_START * 60) * (CELL_HEIGHT / 60);
-        const heightPx = Math.max(slot.duration * (CELL_HEIGHT / 60), 28);
-        return {
-          ...slot,
-          uid: `${day}-${i}-${slot.subjectId}-${slot.startTime}`,
-          classHint: classDaySubjects[day]?.has(slot.subjectId) ?? false,
-          topPx, heightPx,
-        };
-      });
-    });
-    return result;
-  }, [cycleResult, classes]);
-
-  // Aplicar overrides
-  const planByDay = useMemo(() => {
-    const result: Record<number, PlanBlock[]> = {};
-    Object.entries(weekByDay).forEach(([dayStr, blocks]) => {
-      const day = parseInt(dayStr);
-      result[day] = blocks
-        .filter(b => editOverrides[b.uid] !== null)
-        .map(b => {
-          const override = editOverrides[b.uid];
-          if (!override) return b;
-          const newSubject = subjects.find(s => s.id === override);
-          if (!newSubject) return b;
-          return { ...b, subjectId: newSubject.id, subjectName: newSubject.name, classHint: false };
-        });
-    });
-    return result;
-  }, [weekByDay, editOverrides, subjects]);
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleAddClass = () => {
-    if (!newClass.subjectId) { toast.error('Selecione uma disciplina.'); return; }
-    if (newClass.startTime >= newClass.endTime) {
-      toast.error('O horário de início deve ser anterior ao horário de fim.'); return;
-    }
-    const isDuplicate = classes.some(
-      c => c.dayId === newClass.dayId && c.startTime === newClass.startTime && c.subjectId === newClass.subjectId
-    );
-    if (isDuplicate) { toast.error('Aula já cadastrada neste horário.'); return; }
-    setClasses(prev => [...prev, { ...newClass, id: `cls-${Date.now()}` }]);
-    toast.success('Aula adicionada!');
-  };
-
-  const handleSaveConfig = async () => {
-    if (user) {
-      const od = (userProfile?.onboarding_data as Record<string, unknown>) || {};
-      await supabase.from('profiles').update({
-        onboarding_data: { ...od, studyStartTime: startTime, classes },
-      } as any).eq('id', user.id);
-    }
-    setShowConfig(false);
-    setRefreshKey(k => k + 1);
-    toast.success('Configurações salvas! Plano atualizado.');
-  };
-
-  const handleRemoveBlock = useCallback((uid: string) => {
-    setEditOverrides(prev => ({ ...prev, [uid]: null }));
-    setSelectedBlock(null);
-    toast.info('Bloco removido.');
-  }, []);
-
-  const handleSwapSubject = useCallback((uid: string, newSubjectId: string) => {
-    setEditOverrides(prev => ({ ...prev, [uid]: newSubjectId }));
-    setSelectedBlock(null);
-    toast.success('Disciplina alterada!');
-  }, []);
+  // Estatísticas
+  const stats = useMemo(() => {
+    if (!cycleResult) return null;
+    const allSlots = Object.values(byDay).flat();
+    const totalMin = allSlots.reduce((s, sl) => s + sl.duration, 0);
+    const byType: Record<string, number> = {};
+    allSlots.forEach(sl => { byType[sl.type] = (byType[sl.type] || 0) + sl.duration; });
+    const bySubject: Record<string, number> = {};
+    allSlots.forEach(sl => { bySubject[sl.subjectId] = (bySubject[sl.subjectId] || 0) + sl.duration; });
+    const reviewMin = (byType.immediate_review || 0) + (byType.spaced_review || 0) + (byType.difficulty_review || 0);
+    const newContentMin = byType.syllabus_week || 0;
+    const practiceMin = byType.practice || 0;
+    const deepMin = byType.deep_study || 0;
+    return { totalMin, reviewMin, newContentMin, practiceMin, deepMin, bySubject, sessionsCount: allSlots.length };
+  }, [byDay, cycleResult]);
 
   // ── Estado vazio ─────────────────────────────────────────────────────────────
   if (!loading && subjects.length === 0) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600">
-          <CalendarDays className="h-8 w-8 text-white" />
-        </div>
-        <h2 className="text-xl font-bold text-foreground">Nenhum edital importado</h2>
-        <p className="text-sm text-muted-foreground text-center max-w-sm">
+      <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Target size={48} style={{ color: 'var(--text-secondary)', opacity: 0.4 }} />
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Nenhum edital importado</h2>
+        <p className="text-sm text-center max-w-sm" style={{ color: 'var(--text-secondary)' }}>
           Acesse <strong>Plano de Estudos</strong> para importar um edital.
           O planejamento semanal será gerado automaticamente.
         </p>
@@ -316,364 +252,359 @@ const Planning: React.FC = () => {
     );
   }
 
-  // ── Total de horas da semana ─────────────────────────────────────────────────
-  const totalMin = Object.values(planByDay).flat().reduce((s, b) => s + b.duration, 0);
+  const studentName = userProfile?.full_name || 'Estudante';
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border print:hidden">
-        <div className="flex items-center gap-3">
-          {/* Navegação de semana */}
-          <button
-            onClick={() => setWeekOffset(0)}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-accent transition-colors"
-          >
-            Hoje
-          </button>
-          <div className="flex items-center gap-1">
+    <>
+      {/* ── CSS de impressão ─────────────────────────────────────────────────── */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 15mm; }
+          body { background: white !important; color: #1e293b !important; font-size: 11px; }
+          .no-print { display: none !important; }
+          .print-page { background: white !important; padding: 0 !important; }
+          .print-card { background: white !important; border: 1px solid #e2e8f0 !important; break-inside: avoid; }
+          .print-block { background: #f8fafc !important; border-left-color: inherit !important; }
+          .print-header { color: #1e293b !important; }
+          .print-muted { color: #64748b !important; }
+        }
+      `}</style>
+
+      <div className="p-4 md:p-6 max-w-7xl mx-auto print-page">
+
+        {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 no-print">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Target size={24} style={{ color: '#3b82f6' }} />
+              Plano de Estudos
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Gerado pelo algoritmo com base nas suas aulas e disponibilidade
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setWeekOffset(w => w - 1)}
-              className="p-1.5 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+              onClick={() => { setRefreshKey(k => k + 1); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <RefreshCw size={14} /> Regenerar
             </button>
             <button
-              onClick={() => setWeekOffset(w => w + 1)}
-              className="p-1.5 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+              style={{ background: '#3b82f6' }}
             >
-              <ChevronRight className="h-4 w-4" />
+              <Printer size={14} /> Imprimir
             </button>
           </div>
-          <h2 className="text-base font-semibold text-foreground capitalize">
-            {formatMonthYear(monday)}
-          </h2>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            {formatDate(monday)} – {formatDate(weekDates[6])}
-          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden md:inline">
-            {minutesToHM(totalMin)} esta semana
-          </span>
-          <Button size="sm" variant="outline"
-            onClick={() => { setRefreshKey(k => k + 1); setEditOverrides({}); toast.success('Plano regenerado!'); }}
-            className="gap-1.5 text-xs"
+        {/* ── Navegação de semana ───────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mb-6 no-print">
+          <button
+            onClick={() => setWeekOffset(w => w - 1)}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
           >
-            <RefreshCw className="h-3.5 w-3.5" /> Regenerar
-          </Button>
-          <Button size="sm" variant="outline"
-            onClick={() => setShowConfig(v => !v)}
-            className="gap-1.5 text-xs"
-          >
-            <Settings2 className="h-3.5 w-3.5" /> Configurar
-          </Button>
-          <Button size="sm" variant="outline"
-            onClick={() => window.print()}
-            className="gap-1.5 text-xs hidden sm:flex"
-          >
-            <Printer className="h-3.5 w-3.5" /> Imprimir
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Painel de configuração ───────────────────────────────────────────── */}
-      {showConfig && (
-        <div className="border-b border-border bg-card px-4 py-4 print:hidden">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-foreground flex items-center gap-2">
-                <Settings2 className="h-4 w-4 text-primary" />
-                Configurações de Disponibilidade
-              </h3>
-              <button onClick={() => setShowConfig(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
+            <ChevronLeft size={20} />
+          </button>
+          <div className="text-center">
+            <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {fmtDate(weekDates[0])} – {fmtDate(weekDates[6])}
+            </div>
+            {isCurrentWeek && (
+              <div className="text-xs font-medium" style={{ color: '#3b82f6' }}>Semana atual</div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {!isCurrentWeek && (
+              <button onClick={() => setWeekOffset(0)} className="text-xs hover:underline px-2" style={{ color: '#3b82f6' }}>
+                Hoje
               </button>
+            )}
+            <button
+              onClick={() => setWeekOffset(w => w + 1)}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Cabeçalho de impressão ────────────────────────────────────────────── */}
+        <div className="hidden print:block mb-6">
+          <div className="flex items-center justify-between border-b-2 border-gray-200 pb-4 mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Plano de Estudos Semanal</h1>
+              <p className="text-gray-600">{studentName} · {fmtDate(weekDates[0])} a {fmtDate(weekDates[6])}</p>
             </div>
+            <div className="text-right text-sm text-gray-500">
+              <div>StudyFlow</div>
+              <div>Gerado em {new Date().toLocaleDateString('pt-BR')}</div>
+            </div>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Horário de início */}
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                  Horário de início dos estudos
-                </label>
-                <input
-                  type="time" value={startTime}
-                  onChange={e => setStartTime(e.target.value)}
-                  className="px-3 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground w-full"
-                />
-                <p className="text-xs mt-1 text-muted-foreground">
-                  Os blocos serão distribuídos a partir deste horário.
-                </p>
-              </div>
-
-              {/* Adicionar aula */}
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                  Horários de Aula <span className="normal-case font-normal">(opcional)</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <select value={newClass.dayId}
-                    onChange={e => setNewClass(p => ({ ...p, dayId: e.target.value }))}
-                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground col-span-2 sm:col-span-1">
-                    {DAY_IDS.map((d, i) => <option key={d} value={d}>{DAY_NAMES[i]}</option>)}
-                  </select>
-                  <select value={newClass.subjectId}
-                    onChange={e => setNewClass(p => ({ ...p, subjectId: e.target.value }))}
-                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground col-span-2 sm:col-span-1">
-                    <option value="">Disciplina...</option>
-                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                  <input type="time" value={newClass.startTime}
-                    onChange={e => setNewClass(p => ({ ...p, startTime: e.target.value }))}
-                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground" />
-                  <input type="time" value={newClass.endTime}
-                    onChange={e => setNewClass(p => ({ ...p, endTime: e.target.value }))}
-                    className="px-2 py-2 rounded-lg text-sm outline-none bg-input border border-border text-foreground" />
+        {/* ── KPIs ─────────────────────────────────────────────────────────────── */}
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            {[
+              { label: 'Total semanal', value: fmtHours(stats.totalMin), icon: <Clock size={18} />, color: '#3b82f6' },
+              { label: 'Revisão Ativa', value: fmtHours(stats.reviewMin), icon: <RotateCcw size={18} />, color: '#a855f7' },
+              { label: 'Conteúdo Novo', value: fmtHours(stats.newContentMin), icon: <BookOpen size={18} />, color: '#06b6d4' },
+              { label: 'Exercícios', value: fmtHours(stats.practiceMin), icon: <Star size={18} />, color: '#f59e0b' },
+            ].map(item => (
+              <div
+                key={item.label}
+                className="rounded-xl p-4 border print-card"
+                style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center gap-2 mb-1" style={{ color: item.color }}>
+                  {item.icon}
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    {item.label}
+                  </span>
                 </div>
-                <Button size="sm" onClick={handleAddClass} className="gap-1.5 text-xs">
-                  <Plus className="h-3.5 w-3.5" /> Adicionar Aula
-                </Button>
+                <div className="text-2xl font-bold print-header" style={{ color: item.color }}>{item.value}</div>
               </div>
-            </div>
+            ))}
+          </div>
+        )}
 
-            {/* Lista de aulas */}
-            {classes.length > 0 && (
-              <div className="mt-4 space-y-1.5">
-                {classes.map(c => {
-                  const sub = subjects.find(s => s.id === c.subjectId);
+        {/* ── Recomendações ─────────────────────────────────────────────────────── */}
+        {cycleResult && cycleResult.recommendations.length > 0 && (
+          <div
+            className="rounded-xl p-4 mb-6 border print-card"
+            style={{ background: '#3b82f615', borderColor: '#3b82f630' }}
+          >
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: '#3b82f6' }}>
+              <TrendingUp size={14} /> Recomendações do algoritmo
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+              {cycleResult.recommendations.map((rec, i) => (
+                <p key={i} className="text-sm print-muted" style={{ color: 'var(--text-secondary)' }}>• {rec}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Grade semanal ─────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+          {DAYS_ORDER.map(dow => {
+            const date = weekDates[dow === 0 ? 6 : dow - 1];
+            const slots = byDay[dow] ?? [];
+            const dayClasses = classes.filter(c => c.repeats || weekOffset === 0).filter(c => c.dayOfWeek === dow);
+            const isToday = isCurrentWeek && dow === todayDow;
+
+            if (slots.length === 0 && dayClasses.length === 0) return null;
+
+            const dayTotalMin = slots.reduce((s, sl) => s + sl.duration, 0);
+            const classTotalMin = dayClasses.reduce((s, c) => s + (timeToMin(c.endTime) - timeToMin(c.startTime)), 0);
+
+            return (
+              <div
+                key={dow}
+                className="rounded-xl border overflow-hidden print-card"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  borderColor: isToday ? '#3b82f6' : 'var(--border-color)',
+                  boxShadow: isToday ? '0 0 0 1px #3b82f6' : 'none',
+                }}
+              >
+                {/* Cabeçalho do dia */}
+                <div
+                  className="px-4 py-3 border-b"
+                  style={{
+                    borderColor: 'var(--border-color)',
+                    background: isToday ? '#3b82f610' : 'transparent',
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold print-header" style={{ color: isToday ? '#3b82f6' : 'var(--text-primary)' }}>
+                        {DAY_FULL[dow]}
+                      </div>
+                      <div className="text-xs print-muted" style={{ color: 'var(--text-secondary)' }}>
+                        {date ? fmtDate(date) : ''}
+                        {isToday && <span className="ml-1 text-blue-500 font-medium">· Hoje</span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {dayTotalMin > 0 && (
+                        <div className="text-xs font-semibold" style={{ color: '#a855f7' }}>
+                          {fmtHours(dayTotalMin)} estudo
+                        </div>
+                      )}
+                      {classTotalMin > 0 && (
+                        <div className="text-xs" style={{ color: '#3b82f6' }}>
+                          {fmtHours(classTotalMin)} aula
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3">
+                  {/* Blocos de aula (fixos) */}
+                  {dayClasses.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#3b82f6' }}>
+                        Aulas
+                      </div>
+                      {dayClasses.map(c => {
+                        const subject = subjects.find(s => s.id === c.subjectId);
+                        const color = subject?.color || '#3b82f6';
+                        const dur = timeToMin(c.endTime) - timeToMin(c.startTime);
+                        return (
+                          <div
+                            key={c.id}
+                            className="rounded-lg p-2 mb-1.5 print-block"
+                            style={{
+                              background: color + '15',
+                              borderLeft: `3px solid ${color}`,
+                              border: `1px solid ${color}30`,
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-xs" style={{ color }}>
+                                {subject?.name || 'Disciplina'}
+                              </span>
+                              <span className="text-xs print-muted" style={{ color: 'var(--text-secondary)' }}>
+                                {c.startTime}–{c.endTime}
+                              </span>
+                            </div>
+                            <div className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                              <Clock size={10} /> {dur}min
+                              <span className="ml-1 px-1 rounded text-xs" style={{ background: color + '20', color }}>
+                                Aula presencial
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Blocos de estudo (algoritmo) */}
+                  {slots.length > 0 && (
+                    <div>
+                      {dayClasses.length > 0 && (
+                        <div className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#a855f7' }}>
+                          Estudo
+                        </div>
+                      )}
+                      {slots.map((slot, i) => (
+                        <StudyBlock
+                          key={i}
+                          slot={slot}
+                          isPostClass={classDaySubjects[dow]?.has(slot.subjectId) ?? false}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Distribuição por disciplina ───────────────────────────────────────── */}
+        {stats && (
+          <div
+            className="rounded-xl border p-5 mb-6 print-card"
+            style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+          >
+            <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 print-header" style={{ color: 'var(--text-primary)' }}>
+              <BarChart2 size={16} style={{ color: '#3b82f6' }} />
+              Distribuição semanal por disciplina
+            </h3>
+            <div className="space-y-3">
+              {subjects
+                .filter(s => (stats.bySubject[s.id] ?? 0) > 0)
+                .sort((a, b) => (stats.bySubject[b.id] ?? 0) - (stats.bySubject[a.id] ?? 0))
+                .map(subject => {
+                  const min = stats.bySubject[subject.id] ?? 0;
+                  const pct = stats.totalMin > 0 ? Math.round((min / stats.totalMin) * 100) : 0;
+                  const color = subject.color || '#6366f1';
+                  const hasClass = Object.values(classDaySubjects).some(set => set.has(subject.id));
                   return (
-                    <div key={c.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border">
-                      <div className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: getSubjectColor(sub?.name || '', sub?.color) }} />
-                      <span className="text-sm text-foreground flex-1">
-                        {DAY_NAMES[DAY_IDS.indexOf(c.dayId)]} · {c.startTime}–{c.endTime} · {sub?.name || '—'}
-                      </span>
-                      <button onClick={() => setClasses(prev => prev.filter(x => x.id !== c.id))}
-                        className="text-muted-foreground hover:text-destructive transition-colors">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                    <div key={subject.id}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                          <span className="font-medium print-header" style={{ color: 'var(--text-primary)' }}>
+                            {subject.name}
+                          </span>
+                          {hasClass && (
+                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: '#3b82f615', color: '#3b82f6' }}>
+                              tem aula
+                            </span>
+                          )}
+                        </div>
+                        <span className="print-muted" style={{ color: 'var(--text-secondary)' }}>
+                          {fmtHours(min)} · {pct}%
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border-color)' }}>
+                        <div
+                          className="h-2 rounded-full transition-all"
+                          style={{ width: `${pct}%`, background: color }}
+                        />
+                      </div>
                     </div>
                   );
                 })}
-              </div>
-            )}
-
-            <Button onClick={handleSaveConfig} className="mt-4">
-              Salvar e Atualizar Plano
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Aviso sem onboarding ─────────────────────────────────────────────── */}
-      {!userProfile?.onboarding_data && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 print:hidden">
-          <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            Usando configuração padrão (1–2h/dia, Seg–Sex). Clique em <strong>Configurar</strong> para personalizar.
-          </p>
-        </div>
-      )}
-
-      {/* ── Grade do Calendário ──────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto">
-        <div className="min-w-[640px]">
-          {/* Cabeçalho com dias */}
-          <div className="flex border-b border-border bg-card sticky top-0 z-10">
-            {/* Coluna de horas */}
-            <div className="w-14 flex-shrink-0" />
-            {/* Colunas dos dias */}
-            {weekDates.map((date, colIdx) => {
-              const jsDay = date.getDay();
-              const isToday = isCurrentWeek && jsDay === todayJs;
-              const dayHasBlocks = Object.entries(planByDay).some(([d]) => {
-                // planByDay usa jsDay como chave
-                return parseInt(d) === jsDay && planByDay[parseInt(d)]?.length > 0;
-              });
-              return (
-                <div key={colIdx}
-                  className={`flex-1 text-center py-3 border-l border-border ${isToday ? 'bg-primary/5' : ''}`}>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    {DAY_SHORT[colIdx]}
-                  </p>
-                  <div className={`mx-auto mt-1 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                    isToday
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground'
-                  }`}>
-                    {date.getDate()}
-                  </div>
-                  {dayHasBlocks && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mx-auto mt-1" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Grade de horas */}
-          <div className="flex">
-            {/* Coluna de horas */}
-            <div className="w-14 flex-shrink-0 relative">
-              {HOURS.map(h => (
-                <div key={h} style={{ height: CELL_HEIGHT }}
-                  className="border-b border-border/40 flex items-start justify-end pr-2 pt-1">
-                  <span className="text-[10px] text-muted-foreground/60 font-medium">
-                    {String(h).padStart(2, '0')}:00
-                  </span>
-                </div>
-              ))}
             </div>
+          </div>
+        )}
 
-            {/* Colunas dos dias */}
-            {weekDates.map((date, colIdx) => {
-              const jsDay = date.getDay();
-              const isToday = isCurrentWeek && jsDay === todayJs;
-              const blocks = planByDay[jsDay] || [];
-              const totalHours = HOURS.length;
-
-              return (
-                <div key={colIdx}
-                  className={`flex-1 border-l border-border relative ${isToday ? 'bg-primary/[0.02]' : ''}`}
-                  style={{ height: totalHours * CELL_HEIGHT }}
-                >
-                  {/* Linhas de hora */}
-                  {HOURS.map(h => (
-                    <div key={h}
-                      className="absolute w-full border-b border-border/30"
-                      style={{ top: (h - HOUR_START) * CELL_HEIGHT, height: CELL_HEIGHT }}
-                    />
-                  ))}
-
-                  {/* Linha do horário atual (só hoje) */}
-                  {isToday && (() => {
-                    const now = new Date();
-                    const nowMin = now.getHours() * 60 + now.getMinutes();
-                    const topPx = (nowMin - HOUR_START * 60) * (CELL_HEIGHT / 60);
-                    if (topPx < 0 || topPx > totalHours * CELL_HEIGHT) return null;
-                    return (
-                      <div className="absolute w-full z-20 pointer-events-none"
-                        style={{ top: topPx }}>
-                        <div className="flex items-center">
-                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 -ml-1" />
-                          <div className="flex-1 h-px bg-primary" />
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Blocos de estudo */}
-                  {blocks.map(block => {
-                    const color = getSubjectColor(block.subjectName,
-                      subjects.find(s => s.id === block.subjectId)?.color);
-                    const typeColor = SESSION_TYPE_COLORS[block.type] || color;
-                    const isSelected = selectedBlock === block.uid;
-
-                    return (
-                      <div
-                        key={block.uid}
-                        onClick={() => setSelectedBlock(isSelected ? null : block.uid)}
-                        className="absolute left-0.5 right-0.5 rounded-md cursor-pointer overflow-hidden transition-all duration-150 hover:z-30 hover:shadow-lg"
-                        style={{
-                          top: block.topPx,
-                          height: block.heightPx,
-                          background: color,
-                          borderLeft: `3px solid ${color}`,
-                          filter: 'brightness(0.85) saturate(1.1)',
-                          zIndex: isSelected ? 30 : 10,
-                          outline: isSelected ? `2px solid ${color}` : 'none',
-                          outlineOffset: '1px',
-                        }}
-                      >
-                        {(() => {
-                          const textColor = getTextColorForBg(color);
-                          return (
-                        <div className="px-1.5 py-1 h-full flex flex-col justify-between overflow-hidden">
-                          <div>
-                            <p className="text-[11px] font-semibold leading-tight truncate"
-                              style={{ color: textColor }}>
-                              {block.subjectName}
-                            </p>
-                            {block.heightPx > 40 && (
-                              <p className="text-[10px] leading-tight truncate mt-0.5"
-                                style={{ color: textColor, opacity: 0.85 }}>
-                                {SESSION_TYPE_LABELS[block.type] || block.type}
-                              </p>
-                            )}
-                            {block.heightPx > 55 && block.topics && block.topics.length > 0 && (
-                              <p className="text-[9px] leading-tight truncate mt-0.5"
-                                style={{ color: textColor, opacity: 0.75 }}>
-                                {block.topics[0]}
-                              </p>
-                            )}
-                          </div>
-                          {block.heightPx > 32 && (
-                            <p className="text-[9px]" style={{ color: textColor, opacity: 0.8 }}>
-                              {block.startTime}–{block.endTime}
-                            </p>
-                          )}
-                        </div>
-                          );
-                        })()}
-
-                        {/* Popup de edição ao selecionar — FECHAMENTO do bloco acima */}
-                        {isSelected && (
-                          <div
-                            className="absolute left-0 top-full mt-1 z-50 rounded-xl shadow-xl border border-border bg-popover p-3 min-w-[200px]"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <p className="text-xs font-semibold text-foreground mb-1">{block.subjectName}</p>
-                            <p className="text-[10px] text-muted-foreground mb-2">
-                              {block.startTime}–{block.endTime} · {block.duration}min
-                            </p>
-                            {block.topics && block.topics.length > 0 && (
-                              <p className="text-[10px] text-muted-foreground mb-2 italic">
-                                {block.topics.slice(0, 2).join(', ')}
-                              </p>
-                            )}
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-                              Trocar disciplina
-                            </p>
-                            <div className="space-y-1 max-h-32 overflow-y-auto">
-                              {subjects.map(s => (
-                                <button key={s.id}
-                                  onClick={() => handleSwapSubject(block.uid, s.id)}
-                                  className="w-full text-left text-xs px-2 py-1 rounded-lg hover:bg-accent transition-colors flex items-center gap-2"
-                                >
-                                  <div className="w-2 h-2 rounded-full flex-shrink-0"
-                                    style={{ background: getSubjectColor(s.name, s.color) }} />
-                                  {s.name}
-                                </button>
-                              ))}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveBlock(block.uid)}
-                              className="mt-2 w-full text-xs text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors flex items-center gap-1.5"
-                            >
-                              <Trash2 className="h-3 w-3" /> Remover bloco
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+        {/* ── Legenda dos tipos de sessão ───────────────────────────────────────── */}
+        <div
+          className="rounded-xl border p-4 mb-6 print-card"
+          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+        >
+          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 print-muted" style={{ color: 'var(--text-secondary)' }}>
+            Legenda
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {Object.entries(SESSION_LABELS).map(([type, label]) => (
+              <div key={type} className="flex items-center gap-2 text-xs">
+                <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: SESSION_COLORS[type] }} />
+                <span className="print-muted" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* ── Print styles ─────────────────────────────────────────────────────── */}
-      <style>{`
-        @media print {
-          .print\\:hidden { display: none !important; }
-          body { background: white; }
-        }
-      `}</style>
-    </div>
+        {/* ── Rodapé de impressão ───────────────────────────────────────────────── */}
+        <div className="hidden print:block mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
+          <div className="flex items-center justify-between">
+            <span>StudyFlow — Plano gerado automaticamente por algoritmo de revisão espaçada (SM-2)</span>
+            <span>{fmtDateFull(new Date())}</span>
+          </div>
+          <div className="mt-1 text-gray-300">
+            "A revisão ativa é 3× mais eficiente que a releitura passiva." — Cognitive Science Research
+          </div>
+        </div>
+
+        {/* ── Nota sobre Agenda Semanal ─────────────────────────────────────────── */}
+        {classes.length === 0 && (
+          <div
+            className="rounded-xl border border-dashed p-4 text-center no-print"
+            style={{ borderColor: 'var(--border-color)' }}
+          >
+            <CheckCircle size={20} className="mx-auto mb-2 opacity-40" style={{ color: 'var(--text-secondary)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              <strong>Dica:</strong> Cadastre suas aulas na <strong>Agenda Semanal</strong> para que o algoritmo
+              priorize as disciplinas que você teve aula no mesmo dia (efeito de memória fresca).
+            </p>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
