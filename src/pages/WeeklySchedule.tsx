@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStudy } from '@/contexts/StudyContext';
-import { Plus, Trash2, Clock, BookOpen, ChevronLeft, ChevronRight, Repeat, AlertCircle, X } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen, ChevronLeft, ChevronRight, Repeat, AlertCircle, X, CalendarDays } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -8,7 +9,7 @@ const DAY_FULL  = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', '
 
 const HOUR_START = 6;
 const HOUR_END   = 23;
-const CELL_H     = 60; // px por hora
+const CELL_H     = 64; // px por hora
 
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -23,6 +24,9 @@ function addDays(d: Date, n: number): Date {
 }
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+function fmtDateLong(d: Date): string {
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 function timeToMin(t: string): number {
   const [h, m] = t.split(':').map(Number); return h * 60 + m;
@@ -49,6 +53,12 @@ function loadClasses(): ClassEntry[] {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
 }
 
+// Paleta de cores para disciplinas sem cor definida
+const FALLBACK_COLORS = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981',
+  '#3b82f6', '#ef4444', '#14b8a6', '#f97316', '#84cc16',
+];
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const WeeklySchedule: React.FC = () => {
   const { subjects } = useStudy();
@@ -56,6 +66,7 @@ const WeeklySchedule: React.FC = () => {
   // ── Semana ──────────────────────────────────────────────────────────────────
   const [weekOffset, setWeekOffset] = useState(0);
   const monday = useMemo(() => addDays(getMonday(new Date()), weekOffset * 7), [weekOffset]);
+  // Segunda a Domingo (índices 1..6 + 0 reordenado)
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
   const todayDow = new Date().getDay();
   const isCurrentWeek = weekOffset === 0;
@@ -122,10 +133,17 @@ const WeeklySchedule: React.FC = () => {
     return (timeToMin(startTime) - HOUR_START * 60) * (CELL_H / 60);
   }
   function heightPx(startTime: string, endTime: string): number {
-    return Math.max((timeToMin(endTime) - timeToMin(startTime)) * (CELL_H / 60), 24);
+    return Math.max((timeToMin(endTime) - timeToMin(startTime)) * (CELL_H / 60), 28);
   }
 
   const subjectMap = useMemo(() => new Map(subjects.map(s => [s.id, s])), [subjects]);
+
+  function getSubjectColor(subjectId: string): string {
+    const subject = subjectMap.get(subjectId);
+    if (subject?.color) return subject.color;
+    const idx = subjects.findIndex(s => s.id === subjectId);
+    return FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+  }
 
   // ── Linha do tempo atual ─────────────────────────────────────────────────────
   const [nowPx, setNowPx] = useState<number | null>(null);
@@ -143,85 +161,82 @@ const WeeklySchedule: React.FC = () => {
   }, []);
 
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
+  const totalGridHeight = (HOUR_END - HOUR_START + 1) * CELL_H;
 
   return (
-    <div className="min-h-screen p-4 md:p-6" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+    <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
 
       {/* ── Cabeçalho ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen size={24} style={{ color: '#3b82f6' }} />
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+            <CalendarDays className="h-7 w-7 text-primary" />
             Agenda Semanal
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-muted-foreground mt-1 text-sm">
             Cadastre suas aulas. O algoritmo usará isso para gerar seu planejamento.
           </p>
         </div>
         <button
           onClick={() => openAdd()}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors"
-          style={{ background: '#3b82f6', color: '#fff' }}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all bg-primary text-primary-foreground hover:opacity-90 shadow-sm"
         >
-          <Plus size={18} /> Adicionar Aula
+          <Plus size={16} /> Adicionar Aula
         </button>
       </div>
 
       {/* ── Contadores ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="rounded-xl p-4 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
-            <Clock size={14} style={{ color: '#3b82f6' }} />
+        <Card className="p-5">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            <Clock size={13} className="text-primary" />
             Carga Horária Presencial
           </div>
-          <div className="text-3xl font-bold" style={{ color: '#3b82f6' }}>{fmtHours(presentialMin)}</div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <div className="text-3xl font-bold text-primary">{fmtHours(presentialMin)}</div>
+          <div className="text-xs text-muted-foreground mt-1">
             {visibleClasses.length} aula{visibleClasses.length !== 1 ? 's' : ''} esta semana
           </div>
-        </div>
-        <div className="rounded-xl p-4 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-secondary)' }}>
-            <BookOpen size={14} style={{ color: '#a855f7' }} />
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            <BookOpen size={13} className="text-purple-500" />
             Revisão Ativa Recomendada
           </div>
-          <div className="text-3xl font-bold" style={{ color: '#a855f7' }}>{fmtHours(reviewMin)}</div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <div className="text-3xl font-bold text-purple-500">{fmtHours(reviewMin)}</div>
+          <div className="text-xs text-muted-foreground mt-1">
             Reforço pós-aula + revisão espaçada
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* ── Navegação de semana ───────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => setWeekOffset(w => w - 1)}
-          className="p-2 rounded-lg transition-colors"
-          style={{ color: 'var(--text-secondary)' }}
+          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
           <ChevronLeft size={20} />
         </button>
         <div className="text-center">
-          <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="font-semibold text-foreground">
             {fmtDate(weekDates[0])} – {fmtDate(weekDates[6])}
           </div>
           {isCurrentWeek && (
-            <div className="text-xs font-medium" style={{ color: '#3b82f6' }}>Semana atual</div>
+            <div className="text-xs font-medium text-primary">Semana atual</div>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {!isCurrentWeek && (
             <button
               onClick={() => setWeekOffset(0)}
-              className="text-xs hover:underline px-2"
-              style={{ color: '#3b82f6' }}
+              className="text-xs text-primary hover:underline px-2 py-1"
             >
               Hoje
             </button>
           )}
           <button
             onClick={() => setWeekOffset(w => w + 1)}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: 'var(--text-secondary)' }}
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
             <ChevronRight size={20} />
           </button>
@@ -229,47 +244,54 @@ const WeeklySchedule: React.FC = () => {
       </div>
 
       {/* ── Grade do calendário ───────────────────────────────────────────────── */}
-      <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+      <Card className="overflow-hidden">
         {/* Header com dias */}
-        <div className="grid border-b" style={{ gridTemplateColumns: '56px repeat(7, 1fr)', borderColor: 'var(--border-color)' }}>
-          <div className="border-r" style={{ borderColor: 'var(--border-color)' }} />
+        <div
+          className="grid border-b border-border bg-muted/30"
+          style={{ gridTemplateColumns: '52px repeat(7, 1fr)' }}
+        >
+          {/* Célula vazia no canto */}
+          <div className="border-r border-border" />
           {weekDates.map((date, i) => {
             const isToday = isCurrentWeek && date.getDay() === todayDow;
             return (
               <div
                 key={i}
-                className="text-center py-3 border-r last:border-r-0 cursor-pointer transition-colors"
-                style={{ borderColor: 'var(--border-color)', background: isToday ? 'rgba(59,130,246,0.08)' : 'transparent' }}
+                className={`text-center py-3 border-r border-border last:border-r-0 cursor-pointer transition-colors select-none
+                  ${isToday ? 'bg-primary/5' : 'hover:bg-accent/50'}`}
                 onClick={() => openAdd(date.getDay())}
                 title="Clique para adicionar aula neste dia"
               >
-                <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: isToday ? '#3b82f6' : 'var(--text-secondary)' }}>
-                  {DAY_NAMES[date.getDay()]}
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  {DAY_NAMES[(i + 1) % 7]}
                 </div>
                 <div
-                  className="text-lg font-bold mt-0.5 w-8 h-8 flex items-center justify-center rounded-full mx-auto"
-                  style={isToday
-                    ? { background: '#3b82f6', color: '#fff' }
-                    : { color: 'var(--text-primary)' }
-                  }
+                  className={`text-base font-bold mt-0.5 w-8 h-8 flex items-center justify-center rounded-full mx-auto
+                    ${isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}`}
                 >
                   {date.getDate()}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  {fmtDateLong(date).split(' ')[1]}
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Corpo da grade */}
-        <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
-          <div className="relative" style={{ display: 'grid', gridTemplateColumns: '56px repeat(7, 1fr)' }}>
+        {/* Corpo da grade com scroll */}
+        <div className="overflow-y-auto" style={{ maxHeight: '560px' }}>
+          <div
+            className="relative"
+            style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)' }}
+          >
             {/* Coluna de horas */}
-            <div className="border-r" style={{ borderColor: 'var(--border-color)' }}>
+            <div className="border-r border-border bg-muted/10 relative z-10">
               {hours.map(h => (
                 <div
                   key={h}
-                  className="border-b text-right pr-2 text-xs flex items-start justify-end pt-1"
-                  style={{ height: `${CELL_H}px`, borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                  className="border-b border-border/50 text-right pr-2 text-[11px] text-muted-foreground flex items-start justify-end pt-1 select-none"
+                  style={{ height: `${CELL_H}px` }}
                 >
                   {h}:00
                 </div>
@@ -285,36 +307,46 @@ const WeeklySchedule: React.FC = () => {
               return (
                 <div
                   key={colIdx}
-                  className="relative border-r last:border-r-0"
-                  style={{
-                    height: `${(HOUR_END - HOUR_START + 1) * CELL_H}px`,
-                    borderColor: 'var(--border-color)',
-                    background: isToday ? 'rgba(59,130,246,0.03)' : 'transparent',
-                  }}
+                  className={`relative border-r border-border last:border-r-0 cursor-pointer
+                    ${isToday ? 'bg-primary/[0.02]' : 'bg-card'}`}
+                  style={{ height: `${totalGridHeight}px` }}
+                  onClick={() => openAdd(dow)}
                 >
-                  {/* Linhas de hora */}
+                  {/* Linhas de hora (fundo) */}
                   {hours.map(h => (
                     <div
                       key={h}
-                      className="absolute w-full border-b"
-                      style={{ top: `${(h - HOUR_START) * CELL_H}px`, height: `${CELL_H}px`, borderColor: 'var(--border-color)' }}
+                      className="absolute w-full border-b border-border/30"
+                      style={{ top: `${(h - HOUR_START) * CELL_H}px`, height: `${CELL_H}px` }}
+                    />
+                  ))}
+
+                  {/* Meia hora (linha pontilhada) */}
+                  {hours.map(h => (
+                    <div
+                      key={`h-${h}`}
+                      className="absolute w-full border-b border-border/15"
+                      style={{ top: `${(h - HOUR_START) * CELL_H + CELL_H / 2}px` }}
                     />
                   ))}
 
                   {/* Linha do tempo atual */}
                   {isToday && nowPx !== null && (
-                    <div className="absolute w-full z-20 pointer-events-none" style={{ top: `${nowPx}px` }}>
-                      <div className="relative">
-                        <div className="absolute -left-1 w-2 h-2 rounded-full bg-red-500" style={{ transform: 'translateY(-50%)' }} />
-                        <div className="border-t-2 border-red-500 w-full" />
+                    <div
+                      className="absolute w-full z-20 pointer-events-none"
+                      style={{ top: `${nowPx}px` }}
+                    >
+                      <div className="relative flex items-center">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-1.5 flex-shrink-0" />
+                        <div className="flex-1 border-t-2 border-red-500" />
                       </div>
                     </div>
                   )}
 
                   {/* Blocos de aula */}
                   {dayClasses.map(c => {
+                    const color = getSubjectColor(c.subjectId);
                     const subject = subjectMap.get(c.subjectId);
-                    const color = subject?.color || '#6366f1';
                     const top = topPx(c.startTime);
                     const height = heightPx(c.startTime, c.endTime);
                     const durationMin = timeToMin(c.endTime) - timeToMin(c.startTime);
@@ -322,39 +354,45 @@ const WeeklySchedule: React.FC = () => {
                     return (
                       <div
                         key={c.id}
-                        className="absolute rounded-md cursor-pointer group z-10 overflow-hidden"
+                        className="absolute rounded-lg cursor-pointer group z-10 overflow-hidden shadow-sm transition-all hover:shadow-md hover:scale-[1.01]"
                         style={{
-                          top: `${top}px`,
-                          height: `${height}px`,
-                          left: '2px',
-                          right: '2px',
-                          backgroundColor: color + 'dd',
+                          top: `${top + 1}px`,
+                          height: `${height - 2}px`,
+                          left: '3px',
+                          right: '3px',
+                          backgroundColor: color + '22',
                           borderLeft: `3px solid ${color}`,
+                          borderTop: `1px solid ${color}40`,
+                          borderRight: `1px solid ${color}40`,
+                          borderBottom: `1px solid ${color}40`,
                         }}
-                        onClick={() => openEdit(c)}
+                        onClick={e => { e.stopPropagation(); openEdit(c); }}
                         title={`${subject?.name || 'Disciplina'} · ${c.startTime}–${c.endTime} · Clique para editar`}
                       >
-                        <div className="p-1 h-full flex flex-col justify-between">
+                        <div className="p-1.5 h-full flex flex-col justify-between">
                           <div>
-                            <div className="text-white text-xs font-semibold leading-tight truncate">
+                            <div
+                              className="text-[11px] font-semibold leading-tight truncate"
+                              style={{ color }}
+                            >
                               {subject?.name || 'Disciplina'}
                             </div>
-                            {height > 36 && (
-                              <div className="text-white/80 text-xs leading-tight">
+                            {height > 38 && (
+                              <div className="text-[10px] leading-tight mt-0.5" style={{ color: color + 'bb' }}>
                                 {c.startTime}–{c.endTime}
                               </div>
                             )}
                           </div>
-                          {height > 50 && (
+                          {height > 52 && (
                             <div className="flex items-center justify-between">
-                              <span className="text-white/70 text-xs">{durationMin}min</span>
-                              {c.repeats && <Repeat size={10} className="text-white/60" />}
+                              <span className="text-[10px]" style={{ color: color + '99' }}>{durationMin}min</span>
+                              {c.repeats && <Repeat size={9} style={{ color: color + '88' }} />}
                             </div>
                           )}
                         </div>
+                        {/* Botão de remover no hover */}
                         <button
-                          className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5"
-                          style={{ background: 'rgba(0,0,0,0.3)' }}
+                          className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 bg-black/20 hover:bg-black/40"
                           onClick={e => { e.stopPropagation(); deleteClass(c.id); }}
                           title="Remover aula"
                         >
@@ -368,65 +406,65 @@ const WeeklySchedule: React.FC = () => {
             })}
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* ── Lista de aulas ────────────────────────────────────────────────────── */}
-      {classes.length > 0 && (
+      {/* ── Lista de aulas cadastradas ────────────────────────────────────────── */}
+      {classes.length > 0 ? (
         <div className="mt-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-secondary)' }}>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Aulas Cadastradas ({classes.length})
           </h2>
           <div className="space-y-2">
             {[...classes]
               .sort((a, b) => a.dayOfWeek - b.dayOfWeek || timeToMin(a.startTime) - timeToMin(b.startTime))
               .map(c => {
+                const color = getSubjectColor(c.subjectId);
                 const subject = subjectMap.get(c.subjectId);
-                const color = subject?.color || '#6366f1';
                 const durationMin = timeToMin(c.endTime) - timeToMin(c.startTime);
                 return (
-                  <div
+                  <Card
                     key={c.id}
-                    className="flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors"
-                    style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/30 transition-colors"
                     onClick={() => openEdit(c)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                      <div
+                        className="w-1 h-10 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
                       <div>
-                        <div className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
+                        <div className="font-medium text-sm text-foreground">
                           {subject?.name || 'Disciplina'}
                         </div>
-                        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        <div className="text-xs text-muted-foreground">
                           {DAY_FULL[c.dayOfWeek]} · {c.startTime}–{c.endTime} · {durationMin}min
-                          {c.repeats && <span className="ml-2" style={{ color: '#3b82f6' }}>↻ repete toda semana</span>}
+                          {c.repeats && (
+                            <span className="ml-2 text-primary">↻ toda semana</span>
+                          )}
                         </div>
                       </div>
                     </div>
                     <button
                       onClick={e => { e.stopPropagation(); deleteClass(c.id); }}
-                      className="p-1.5 rounded-lg transition-colors"
-                      style={{ color: 'var(--text-secondary)' }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     >
                       <Trash2 size={14} />
                     </button>
-                  </div>
+                  </Card>
                 );
               })}
           </div>
         </div>
-      )}
-
-      {classes.length === 0 && (
-        <div className="mt-8 text-center py-12 rounded-xl border border-dashed" style={{ borderColor: 'var(--border-color)' }}>
-          <BookOpen size={40} className="mx-auto mb-3 opacity-40" style={{ color: 'var(--text-secondary)' }} />
-          <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Nenhuma aula cadastrada ainda</p>
-          <p className="text-sm mt-1 mb-4 opacity-70" style={{ color: 'var(--text-secondary)' }}>
+      ) : (
+        <div className="mt-8 text-center py-14 rounded-2xl border border-dashed border-border">
+          <CalendarDays size={40} className="mx-auto mb-3 text-muted-foreground/40" />
+          <p className="font-medium text-muted-foreground">Nenhuma aula cadastrada ainda</p>
+          <p className="text-sm mt-1 mb-5 text-muted-foreground/70">
             Adicione suas aulas para que o algoritmo gere um planejamento personalizado
           </p>
           <button
             onClick={() => openAdd()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors"
-            style={{ background: '#3b82f6', color: '#fff' }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
           >
             <Plus size={16} /> Adicionar primeira aula
           </button>
@@ -435,28 +473,35 @@ const WeeklySchedule: React.FC = () => {
 
       {/* ── Modal ─────────────────────────────────────────────────────────────── */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-          <div className="rounded-2xl shadow-2xl w-full max-w-md border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--border-color)' }}>
-              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}
+        >
+          <Card className="w-full max-w-md shadow-2xl border-border/80">
+            {/* Header do modal */}
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h2 className="text-lg font-bold text-foreground">
                 {editingId ? 'Editar Aula' : 'Adicionar Aula'}
               </h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg transition-colors">
-                <X size={18} style={{ color: 'var(--text-secondary)' }} />
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <X size={18} />
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-5">
               {/* Disciplina */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                   Disciplina
                 </label>
                 <select
                   value={form.subjectId}
                   onChange={e => setForm(f => ({ ...f, subjectId: e.target.value }))}
-                  className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                  style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                  className="w-full rounded-lg px-3 py-2.5 text-sm bg-input border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Selecione uma disciplina</option>
                   {subjects.map(s => (
@@ -467,19 +512,20 @@ const WeeklySchedule: React.FC = () => {
 
               {/* Dia da semana */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                   Dia da Semana
                 </label>
                 <div className="grid grid-cols-7 gap-1">
                   {DAY_NAMES.map((name, i) => (
                     <button
                       key={i}
+                      type="button"
                       onClick={() => setForm(f => ({ ...f, dayOfWeek: i }))}
-                      className="py-2 rounded-lg text-xs font-medium transition-colors"
-                      style={form.dayOfWeek === i
-                        ? { background: '#3b82f6', color: '#fff' }
-                        : { background: 'var(--bg-primary)', color: 'var(--text-secondary)' }
-                      }
+                      className={`py-2 rounded-lg text-xs font-medium transition-colors
+                        ${form.dayOfWeek === i
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
+                        }`}
                     >
                       {name}
                     </button>
@@ -490,34 +536,32 @@ const WeeklySchedule: React.FC = () => {
               {/* Horários */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     Início
                   </label>
                   <input
                     type="time"
                     value={form.startTime}
                     onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                    style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                    className="w-full rounded-lg px-3 py-2.5 text-sm bg-input border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     Término
                   </label>
                   <input
                     type="time"
                     value={form.endTime}
                     onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                    style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                    className="w-full rounded-lg px-3 py-2.5 text-sm bg-input border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
 
               {/* Duração calculada */}
               {form.startTime && form.endTime && timeToMin(form.endTime) > timeToMin(form.startTime) && (
-                <div className="text-xs flex items-center gap-1" style={{ color: '#3b82f6' }}>
+                <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 rounded-lg px-3 py-2">
                   <Clock size={12} />
                   Duração: {timeToMin(form.endTime) - timeToMin(form.startTime)} minutos
                 </div>
@@ -525,59 +569,66 @@ const WeeklySchedule: React.FC = () => {
 
               {/* Repetir toda semana */}
               <div
-                className="flex items-center justify-between p-3 rounded-lg border cursor-pointer"
-                style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+                className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-muted/30 cursor-pointer hover:bg-accent/30 transition-colors"
                 onClick={() => setForm(f => ({ ...f, repeats: !f.repeats }))}
               >
-                <div className="flex items-center gap-2">
-                  <Repeat size={16} style={{ color: '#3b82f6' }} />
+                <div className="flex items-center gap-2.5">
+                  <Repeat size={16} className="text-primary" />
                   <div>
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Repetir toda semana</div>
-                    <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="text-sm font-medium text-foreground">Repetir toda semana</div>
+                    <div className="text-xs text-muted-foreground">
                       {form.repeats ? 'Aparece em todas as semanas' : 'Aparece apenas na semana atual'}
                     </div>
                   </div>
                 </div>
-                <div className="w-10 h-5 rounded-full relative transition-colors" style={{ background: form.repeats ? '#3b82f6' : 'var(--border-color)' }}>
-                  <div className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform" style={{ transform: form.repeats ? 'translateX(20px)' : 'translateX(2px)' }} />
+                {/* Toggle */}
+                <div
+                  className="w-10 h-5 rounded-full relative transition-colors flex-shrink-0"
+                  style={{ background: form.repeats ? 'hsl(var(--primary))' : 'hsl(var(--border))' }}
+                >
+                  <div
+                    className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                    style={{ transform: form.repeats ? 'translateX(20px)' : 'translateX(2px)' }}
+                  />
                 </div>
               </div>
 
               {/* Erro */}
               {formError && (
-                <div className="flex items-center gap-2 text-sm rounded-lg px-3 py-2" style={{ color: '#f87171', background: 'rgba(239,68,68,0.1)' }}>
+                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
                   <AlertCircle size={14} />
                   {formError}
                 </div>
               )}
             </div>
 
-            <div className="flex gap-3 p-5 border-t" style={{ borderColor: 'var(--border-color)' }}>
+            {/* Footer do modal */}
+            <div className="flex gap-3 p-5 border-t border-border">
               {editingId && (
                 <button
+                  type="button"
                   onClick={() => { deleteClass(editingId); setShowModal(false); }}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors"
-                  style={{ borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' }}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/10 transition-colors"
                 >
                   <Trash2 size={14} /> Excluir
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors"
-                style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:bg-accent transition-colors"
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={saveClass}
-                className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
-                style={{ background: '#3b82f6' }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 {editingId ? 'Salvar' : 'Adicionar'}
               </button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
