@@ -7,12 +7,13 @@
  * Layout imprimível em A4 para o estudante colar na parede ou agenda.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, Printer, RefreshCw,
   BookOpen, Clock, BarChart2, Zap, CheckCircle, AlertTriangle,
   Star, RotateCcw, Target, TrendingUp,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useStudy } from '@/contexts/StudyContext';
 import { generateStudentCycle, extractDifficultyTopics } from '@/lib/cycleAdapter';
 import { formatCycleForWeek, CycleSlot } from '@/lib/cycleGeneratorV2';
@@ -146,6 +147,13 @@ const Planning: React.FC = () => {
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [seed, setSeed] = useState(() => Math.random());
+
+  const handleRefresh = useCallback(() => {
+    setSeed(Math.random());
+    setRefreshKey(k => k + 1);
+    toast.success('Plano atualizado com nova distribuição!');
+  }, []);
 
   const monday = useMemo(() => addDays(getMonday(new Date()), weekOffset * 7), [weekOffset]);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
@@ -201,14 +209,16 @@ const Planning: React.FC = () => {
         : (s.priority || 3),
     }));
     try {
+      // Usa seed para embaralhar a ordem das disciplinas e gerar variação real
+      const shuffled = [...subjectsWithHint].sort(() => seed - 0.5);
       return generateStudentCycle(
         user?.id || 'anon',
         userProfile?.full_name || 'Estudante',
-        onboarding, subjectsWithHint, topicsBySubject, difficultyTopics
+        onboarding, shuffled, topicsBySubject, difficultyTopics
       );
     } catch { return null; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjects, onboarding, topicsBySubject, difficultyTopics, classDaySubjects, refreshKey]);
+  }, [subjects, onboarding, topicsBySubject, difficultyTopics, classDaySubjects, refreshKey, seed]);
 
   const byDay = useMemo(() => {
     if (!cycleResult) return {} as Record<number, CycleSlot[]>;
@@ -285,11 +295,11 @@ const Planning: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setRefreshKey(k => k + 1); }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors"
+              onClick={handleRefresh}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-accent/50"
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             >
-              <RefreshCw size={14} /> Regenerar
+              <RefreshCw size={14} /> Atualizar Plano
             </button>
             <button
               onClick={() => window.print()}
