@@ -292,7 +292,7 @@ const StudentEditais: React.FC = () => {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Edital Verticalizado</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Edital Verticalizado</h1>
           <p className="mt-1 text-sm" style={{ color: muted }}>
             Clique nas bolinhas para marcar seu progresso por tópico
           </p>
@@ -374,7 +374,7 @@ const StudentEditais: React.FC = () => {
       {/* Progresso global */}
       <Card className="mb-6 p-5" style={{ background: cardBg, border: `1px solid ${border}` }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-white flex items-center gap-2">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
             <BookOpen className="h-4 w-4" style={{ color: primaryBlue }} />
             Seu Progresso — {activeExam.name}
           </h2>
@@ -406,7 +406,7 @@ const StudentEditais: React.FC = () => {
 
       {/* Controles */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-medium text-white">{activeExam.subjects.length} disciplinas</p>
+        <p className="text-sm font-medium text-foreground">{activeExam.subjects.length} disciplinas</p>
         <div className="flex gap-2">
           <Button
             size="sm" variant="ghost"
@@ -451,7 +451,7 @@ const StudentEditais: React.FC = () => {
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
-                  <span className="font-semibold text-white text-sm truncate">{subject.name}</span>
+                  <span className="font-semibold text-foreground text-sm truncate">{subject.name}</span>
                   <Badge
                     className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
                     style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}
