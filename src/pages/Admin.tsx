@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Trash2, Save, X, Lock, LogOut, BookOpen, Edit2, Link2, Unlink } from 'lucide-react';
+import { Plus, Trash2, Save, X, Lock, LogOut, BookOpen, Edit2, Link2, Unlink, Download, AlertCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { presetExams } from '@/data/presetExams';
 
 const ADMIN_KEY = 'sf_admin_v1';
 const ADMIN_PWD = import.meta.env.VITE_ADMIN_PASSWORD || '';
@@ -51,6 +52,9 @@ const Admin: React.FC = () => {
   const [presets, setPresets] = useState<AdminPreset[]>([]);
   const [subjects, setSubjects] = useState<AdminSubject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [migrationNeeded, setMigrationNeeded] = useState(false);
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedMessage, setSeedMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
 
@@ -71,7 +75,14 @@ const Admin: React.FC = () => {
   const loadAll = useCallback(async () => {
     setLoading(true);
 
-    const { data: subRows } = await supabase.from('admin_subjects').select('*').order('sort_order');
+    const { data: subRows, error: subErr } = await supabase.from('admin_subjects').select('*').order('sort_order');
+    if (subErr) {
+      // Tabela não existe — migração pendente
+      setMigrationNeeded(true);
+      setLoading(false);
+      return;
+    }
+    setMigrationNeeded(false);
     const allSubjects: AdminSubject[] = await Promise.all((subRows || []).map(async s => {
       const { data: topRows } = await supabase.from('admin_topics').select('*').eq('subject_id', s.id).order('sort_order');
       return { ...s, topics: topRows || [] };
@@ -177,12 +188,149 @@ const Admin: React.FC = () => {
     await loadAll();
   }
 
+  // ── Seed de editais padrão ────────────────────────────────────────────────────
+  async function seedBuiltinPresets() {
+    setSeedLoading(true);
+    setSeedMessage(null);
+    try {
+      const COLORS = ['#4338CA', '#E11D48', '#059669', '#D97706', '#7C3AED', '#0891B2', '#DC2626', '#2563EB', '#CA8A04', '#9333EA'];
+
+      // Mapa de disciplinas únicas (mesclagem por nome)
+      const subjectMap = new Map<string, { priority: number; color: string; topics: string[] }>();
+      let colorIdx = 0;
+      for (const preset of presetExams) {
+        for (const subj of preset.subjects) {
+          if (!subjectMap.has(subj.name)) {
+            subjectMap.set(subj.name, {
+              priority: subj.priority,
+              color: COLORS[colorIdx % COLORS.length],
+              topics: [...subj.topics],
+            });
+            colorIdx++;
+          } else {
+            const existing = subjectMap.get(subj.name)!;
+            existing.priority = Math.max(existing.priority, subj.priority);
+            const existingSet = new Set(existing.topics);
+            subj.topics.forEach(t => { if (!existingSet.has(t)) existing.topics.push(t); });
+          }
+        }
+      }
+
+      // Inserir disciplinas e assuntos
+      const subjectIdByName = new Map<string, string>();
+      let sortOrder = 0;
+      for (const [name, { priority, color, topics }] of subjectMap) {
+        const { data: sd, error } = await supabase
+          .from('admin_subjects')
+          .insert({ name, priority, color, sort_order: sortOrder++ })
+          .select().single();
+        if (error || !sd) continue;
+        subjectIdByName.set(name, sd.id);
+        if (topics.length > 0) {
+          await supabase.from('admin_topics').insert(
+            topics.map((t, i) => ({ subject_id: sd.id, name: t, sort_order: i })) as any
+          );
+        }
+      }
+
+      // Inserir editais e vincular disciplinas
+      let presetOrder = 0;
+      let created = 0;
+      for (const preset of presetExams) {
+        const { data: pd, error } = await supabase
+          .from('admin_presets')
+          .insert({ name: preset.name, description: preset.description || '', sort_order: presetOrder++ })
+          .select().single();
+        if (error || !pd) continue;
+        created++;
+        const links = preset.subjects
+          .map((s, i) => {
+            const sid = subjectIdByName.get(s.name);
+            return sid ? { preset_id: pd.id, subject_id: sid, sort_order: i } : null;
+          })
+          .filter(Boolean);
+        if (links.length > 0) {
+          await supabase.from('admin_preset_subjects').insert(links as any);
+        }
+      }
+
+      await loadAll();
+      setSeedMessage({ type: 'ok', text: `${created} editais importados com ${subjectMap.size} disciplinas na biblioteca.` });
+    } catch (err: any) {
+      setSeedMessage({ type: 'err', text: err?.message || 'Erro ao importar. Verifique se a migração foi executada.' });
+    } finally {
+      setSeedLoading(false);
+    }
+  }
+
   if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />;
 
   const unlinkedSubjects = subjects.filter(s => !selectedPreset?.subjects.some(ls => ls.id === s.id));
   const filteredUnlinked = pickerSearch
     ? unlinkedSubjects.filter(s => s.name.toLowerCase().includes(pickerSearch.toLowerCase()))
     : unlinkedSubjects;
+
+  // Banner de migração pendente
+  if (migrationNeeded) {
+    const migrationSQL = `-- Execute no Supabase Dashboard → SQL Editor
+drop table if exists public.admin_preset_topics;
+drop table if exists public.admin_preset_subjects;
+
+create table if not exists public.admin_subjects (
+  id uuid primary key default gen_random_uuid(),
+  name text not null, priority integer not null default 3,
+  color text not null default '#6366f1', sort_order integer not null default 0,
+  created_at timestamptz default now(), updated_at timestamptz default now()
+);
+create table if not exists public.admin_topics (
+  id uuid primary key default gen_random_uuid(),
+  subject_id uuid references public.admin_subjects(id) on delete cascade not null,
+  name text not null, sort_order integer not null default 0, created_at timestamptz default now()
+);
+create table if not exists public.admin_preset_subjects (
+  id uuid primary key default gen_random_uuid(),
+  preset_id uuid references public.admin_presets(id) on delete cascade not null,
+  subject_id uuid references public.admin_subjects(id) on delete cascade not null,
+  sort_order integer not null default 0, created_at timestamptz default now(),
+  unique(preset_id, subject_id)
+);
+alter table public.admin_subjects enable row level security;
+alter table public.admin_topics enable row level security;
+alter table public.admin_preset_subjects enable row level security;
+create policy "Public read admin_subjects" on public.admin_subjects for select using (true);
+create policy "Auth write admin_subjects" on public.admin_subjects for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Public read admin_topics" on public.admin_topics for select using (true);
+create policy "Auth write admin_topics" on public.admin_topics for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Public read admin_preset_subjects" on public.admin_preset_subjects for select using (true);
+create policy "Auth write admin_preset_subjects" on public.admin_preset_subjects for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');`;
+
+    return (
+      <div className="min-h-screen bg-background flex items-start justify-center pt-16 p-4">
+        <Card className="w-full max-w-2xl p-8 space-y-6">
+          <div className="flex items-start gap-4">
+            <AlertCircle className="h-6 w-6 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h2 className="font-bold text-foreground text-lg">Migração de banco necessária</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                As tabelas do painel admin ainda não foram criadas no Supabase. Execute o SQL abaixo no <strong>Supabase Dashboard → SQL Editor</strong> e depois clique em "Já executei".
+              </p>
+            </div>
+          </div>
+          <pre className="bg-muted rounded-lg p-4 text-xs text-muted-foreground overflow-auto max-h-64 whitespace-pre-wrap">{migrationSQL}</pre>
+          <div className="flex gap-3">
+            <button onClick={() => loadAll()}
+              className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
+              Já executei — recarregar
+            </button>
+            <button onClick={() => { sessionStorage.removeItem(ADMIN_KEY); setUnlocked(false); }}
+              className="px-4 py-3 rounded-xl border border-border text-muted-foreground text-sm hover:bg-accent">
+              Sair
+            </button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -215,12 +363,37 @@ const Admin: React.FC = () => {
             <>
               <div className="p-3 border-b border-border flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Editais ({presets.length})</span>
-                <button onClick={() => setPresetModal({ open: true, name: '', description: '' })}
-                  className="p-1 rounded-lg hover:bg-accent text-primary"><Plus size={16} /></button>
+                <div className="flex items-center gap-1">
+                  {presets.length > 0 && (
+                    <button onClick={seedBuiltinPresets} disabled={seedLoading} title="Importar editais padrão"
+                      className="p-1 rounded-lg hover:bg-accent text-muted-foreground hover:text-primary transition-colors disabled:opacity-50">
+                      <Download size={14} />
+                    </button>
+                  )}
+                  <button onClick={() => setPresetModal({ open: true, name: '', description: '' })}
+                    className="p-1 rounded-lg hover:bg-accent text-primary"><Plus size={16} /></button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
                 {loading ? <p className="text-xs text-muted-foreground text-center py-8">Carregando…</p>
-                  : presets.length === 0 ? <p className="text-xs text-muted-foreground text-center py-8">Nenhum edital ainda.</p>
+                  : presets.length === 0 ? (
+                    <div className="px-3 py-6 space-y-3 text-center">
+                      <p className="text-xs text-muted-foreground">Nenhum edital ainda.</p>
+                      <button
+                        onClick={seedBuiltinPresets}
+                        disabled={seedLoading}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        <Download size={12} />
+                        {seedLoading ? 'Importando…' : 'Importar editais padrão'}
+                      </button>
+                      {seedMessage && (
+                        <p className={`text-xs ${seedMessage.type === 'ok' ? 'text-green-600' : 'text-destructive'}`}>
+                          {seedMessage.text}
+                        </p>
+                      )}
+                    </div>
+                  )
                   : presets.map(p => (
                     <div key={p.id} onClick={() => setSelectedPresetId(p.id)}
                       className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${selectedPresetId === p.id ? 'bg-primary/10 text-primary' : 'hover:bg-accent text-foreground'}`}>
