@@ -36,6 +36,12 @@ function fmtHours(min: number): string {
   if (m === 0) return `${h}h`;
   return `${h}h${m.toString().padStart(2,'0')}`;
 }
+function calcDuration(startTime: string, endTime: string, overnight = false): number {
+  const s = timeToMin(startTime); const e = timeToMin(endTime);
+  if (e > s) return e - s;
+  if (overnight) return 24 * 60 - s + e;
+  return 0;
+}
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type EntryType = 'class' | 'sleep' | 'exercise';
@@ -109,7 +115,7 @@ const WeeklySchedule: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     type: 'class' as EntryType,
-    dayOfWeek: 1,
+    days: [1] as number[],
     startTime: '07:00',
     endTime: '08:30',
     subjectId: '',
@@ -118,25 +124,38 @@ const WeeklySchedule: React.FC = () => {
   });
   const [formError, setFormError] = useState('');
 
+  function toggleDay(i: number) {
+    setForm(f => ({
+      ...f,
+      days: f.days.includes(i) ? f.days.filter(d => d !== i) : [...f.days, i],
+    }));
+  }
+
   function openAdd(dayOfWeek?: number) {
     setEditingId(null);
-    setForm({ type: 'class', dayOfWeek: dayOfWeek ?? 1, startTime: '07:00', endTime: '08:30', subjectId: subjects[0]?.id || '', label: '', repeats: true });
+    setForm({ type: 'class', days: [dayOfWeek ?? 1], startTime: '07:00', endTime: '08:30', subjectId: subjects[0]?.id || '', label: '', repeats: true });
     setFormError('');
     setShowModal(true);
   }
   function openEdit(c: ClassEntry) {
     setEditingId(c.id);
-    setForm({ type: c.type || 'class', dayOfWeek: c.dayOfWeek, startTime: c.startTime, endTime: c.endTime, subjectId: c.subjectId, label: c.label || '', repeats: c.repeats });
+    setForm({ type: c.type || 'class', days: [c.dayOfWeek], startTime: c.startTime, endTime: c.endTime, subjectId: c.subjectId, label: c.label || '', repeats: c.repeats });
     setFormError('');
     setShowModal(true);
   }
   function saveEntry() {
     if (form.type === 'class' && !form.subjectId) { setFormError('Selecione uma disciplina.'); return; }
-    if (timeToMin(form.endTime) <= timeToMin(form.startTime)) { setFormError('O horário de término deve ser após o início.'); return; }
+    if (form.days.length === 0) { setFormError('Selecione ao menos um dia.'); return; }
+    const overnight = form.type === 'sleep';
+    const dur = calcDuration(form.startTime, form.endTime, overnight);
+    if (dur <= 0) { setFormError('Horário de término inválido.'); return; }
     if (editingId) {
-      setClasses(prev => prev.map(c => c.id === editingId ? { ...c, ...form } : c));
+      setClasses(prev => prev.map(c => c.id === editingId ? { ...c, ...form, dayOfWeek: form.days[0] } : c));
     } else {
-      setClasses(prev => [...prev, { id: crypto.randomUUID(), ...form }]);
+      setClasses(prev => [
+        ...prev,
+        ...form.days.map(day => ({ id: crypto.randomUUID(), type: form.type, dayOfWeek: day, startTime: form.startTime, endTime: form.endTime, subjectId: form.subjectId, label: form.label, repeats: form.repeats })),
+      ]);
     }
     setShowModal(false);
   }
@@ -148,7 +167,7 @@ const WeeklySchedule: React.FC = () => {
   const { presentialMin, reviewMin } = useMemo(() => {
     let presential = 0;
     visibleClasses.filter(c => !c.type || c.type === 'class')
-      .forEach(c => { presential += timeToMin(c.endTime) - timeToMin(c.startTime); });
+      .forEach(c => { presential += calcDuration(c.startTime, c.endTime); });
     return { presentialMin: presential, reviewMin: Math.round(presential * 1.5) };
   }, [visibleClasses]);
 
@@ -328,8 +347,8 @@ const WeeklySchedule: React.FC = () => {
                     const label = getEntryLabel(entry);
                     const top = topPx(entry.startTime);
                     const height = heightPx(entry.startTime, entry.endTime);
-                    const durationMin = timeToMin(entry.endTime) - timeToMin(entry.startTime);
                     const entryType = entry.type || 'class';
+                    const durationMin = calcDuration(entry.startTime, entry.endTime, entryType === 'sleep');
 
                     return (
                       <div
@@ -398,7 +417,7 @@ const WeeklySchedule: React.FC = () => {
                 const color = getEntryColor(entry);
                 const label = getEntryLabel(entry);
                 const entryType = entry.type || 'class';
-                const durationMin = timeToMin(entry.endTime) - timeToMin(entry.startTime);
+                const durationMin = calcDuration(entry.startTime, entry.endTime, entryType === 'sleep');
                 return (
                   <Card
                     key={entry.id}
@@ -535,15 +554,17 @@ const WeeklySchedule: React.FC = () => {
 
               {/* Dia da semana */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Dia da Semana</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  Dia da Semana {!editingId && <span className="normal-case font-normal">(pode selecionar vários)</span>}
+                </label>
                 <div className="grid grid-cols-7 gap-1">
                   {DAY_NAMES.map((name, i) => (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, dayOfWeek: i }))}
+                      onClick={() => editingId ? setForm(f => ({ ...f, days: [i] })) : toggleDay(i)}
                       className={`py-2 rounded-lg text-xs font-medium transition-colors
-                        ${form.dayOfWeek === i ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                        ${form.days.includes(i) ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'}`}
                     >
                       {name}
                     </button>
@@ -563,12 +584,20 @@ const WeeklySchedule: React.FC = () => {
                 </div>
               </div>
 
-              {form.startTime && form.endTime && timeToMin(form.endTime) > timeToMin(form.startTime) && (
-                <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 rounded-lg px-3 py-2">
-                  <Clock size={12} />
-                  Duração: {timeToMin(form.endTime) - timeToMin(form.startTime)} minutos
-                </div>
-              )}
+              {form.startTime && form.endTime && (() => {
+                const overnight = form.type === 'sleep';
+                const dur = calcDuration(form.startTime, form.endTime, overnight);
+                if (dur <= 0) return null;
+                return (
+                  <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 rounded-lg px-3 py-2">
+                    <Clock size={12} />
+                    Duração: {fmtHours(dur)}
+                    {overnight && timeToMin(form.endTime) < timeToMin(form.startTime) && (
+                      <span className="ml-1 text-muted-foreground">(cruza meia-noite)</span>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Repetir toda semana */}
               <div
