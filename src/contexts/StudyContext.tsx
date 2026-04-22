@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Subject, Topic, StudySession, Review, StudyCycleItem, UserProfile, TopicStatus, SessionType, ClassMode } from '@/types/study';
+import { Subject, Topic, StudySession, Review, StudyCycleItem, UserProfile, ScheduleEntry, TopicStatus, SessionType, ClassMode } from '@/types/study';
 import { presetExams } from '@/data/presetExams';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,6 +12,7 @@ interface StudyContextType {
   studySessions: StudySession[];
   reviews: Review[];
   studyCycle: StudyCycleItem[];
+  scheduleEntries: ScheduleEntry[];
   userProfile: UserProfile;
   importedPresets: string[];
   loading: boolean;
@@ -27,6 +28,9 @@ interface StudyContextType {
   removePreset: (presetId: string) => Promise<void>;
   generateCycle: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  addScheduleEntries: (entries: Omit<ScheduleEntry, 'id'>[]) => Promise<void>;
+  updateScheduleEntry: (id: string, changes: Partial<Omit<ScheduleEntry, 'id'>>) => Promise<void>;
+  removeScheduleEntry: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -53,6 +57,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [studyCycle, setStudyCycle] = useState<StudyCycleItem[]>([]);
+  const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [importedPresets, setImportedPresets] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +94,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!user) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [subRes, topRes, sessRes, revRes, cycRes, profRes, impRes] = await Promise.all([
+      const [subRes, topRes, sessRes, revRes, cycRes, profRes, impRes, schedRes] = await Promise.all([
         supabase.from('subjects').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('topics').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('study_sessions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
@@ -97,6 +102,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         supabase.from('study_cycle').select('*').eq('user_id', user.id).order('sort_order'),
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('imported_presets').select('preset_id').eq('user_id', user.id),
+        supabase.from('schedule_entries').select('*').eq('user_id', user.id).order('day_of_week'),
       ]);
 
       if (subRes.data) setSubjects(subRes.data.map((s: any) => ({ id: s.id, name: s.name, priority: s.priority, color: s.color })));
@@ -126,9 +132,18 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           availability: (p.availability as Record<string, number>) || defaultProfile.availability,
           reviewIntervals: (p.review_intervals as number[]) || defaultProfile.reviewIntervals,
           onboarding_data: p.onboarding_data ?? undefined,
+          studyStartTime: p.study_start_time || '08:00',
+          activeEditalId: p.active_edital_id || undefined,
+          wellnessDismissedAt: p.wellness_dismissed_at || undefined,
+          theme: p.theme || 'dark',
         });
       }
       if (impRes.data) setImportedPresets(impRes.data.map((i: any) => i.preset_id));
+      if (schedRes.data) setScheduleEntries(schedRes.data.map((e: any) => ({
+        id: e.id, type: e.type, dayOfWeek: e.day_of_week,
+        startTime: e.start_time, endTime: e.end_time,
+        subjectId: e.subject_id || '', label: e.label || '', repeats: e.repeats,
+      })));
     } finally {
       setLoading(false);
     }
@@ -323,16 +338,59 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (profile.examDate !== undefined) dbUpdates.exam_date = profile.examDate || null;
     if (profile.availability !== undefined) dbUpdates.availability = profile.availability;
     if (profile.reviewIntervals !== undefined) dbUpdates.review_intervals = profile.reviewIntervals;
+    if (profile.studyStartTime !== undefined) dbUpdates.study_start_time = profile.studyStartTime;
+    if (profile.activeEditalId !== undefined) dbUpdates.active_edital_id = profile.activeEditalId || null;
+    if (profile.wellnessDismissedAt !== undefined) dbUpdates.wellness_dismissed_at = profile.wellnessDismissedAt;
+    if (profile.theme !== undefined) dbUpdates.theme = profile.theme;
 
     const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', user.id);
     if (!error) setUserProfile(prev => ({ ...prev, ...profile }));
   }, [user]);
 
+  const addScheduleEntries = useCallback(async (entries: Omit<ScheduleEntry, 'id'>[]) => {
+    if (!user) return;
+    const rows = entries.map(e => ({
+      user_id: user.id, type: e.type, day_of_week: e.dayOfWeek,
+      start_time: e.startTime, end_time: e.endTime,
+      subject_id: e.subjectId || null, label: e.label || null, repeats: e.repeats,
+    }));
+    const { data, error } = await supabase.from('schedule_entries').insert(rows as any).select();
+    if (!error && data) {
+      setScheduleEntries(prev => [...prev, ...data.map((e: any) => ({
+        id: e.id, type: e.type, dayOfWeek: e.day_of_week,
+        startTime: e.start_time, endTime: e.end_time,
+        subjectId: e.subject_id || '', label: e.label || '', repeats: e.repeats,
+      }))]);
+    }
+  }, [user]);
+
+  const updateScheduleEntry = useCallback(async (id: string, changes: Partial<Omit<ScheduleEntry, 'id'>>) => {
+    if (!user) return;
+    const dbChanges: any = {};
+    if (changes.type !== undefined) dbChanges.type = changes.type;
+    if (changes.dayOfWeek !== undefined) dbChanges.day_of_week = changes.dayOfWeek;
+    if (changes.startTime !== undefined) dbChanges.start_time = changes.startTime;
+    if (changes.endTime !== undefined) dbChanges.end_time = changes.endTime;
+    if (changes.subjectId !== undefined) dbChanges.subject_id = changes.subjectId || null;
+    if (changes.label !== undefined) dbChanges.label = changes.label || null;
+    if (changes.repeats !== undefined) dbChanges.repeats = changes.repeats;
+    dbChanges.updated_at = new Date().toISOString();
+    const { error } = await supabase.from('schedule_entries').update(dbChanges).eq('id', id).eq('user_id', user.id);
+    if (!error) setScheduleEntries(prev => prev.map(e => e.id === id ? { ...e, ...changes } : e));
+  }, [user]);
+
+  const removeScheduleEntry = useCallback(async (id: string) => {
+    if (!user) return;
+    await supabase.from('schedule_entries').delete().eq('id', id).eq('user_id', user.id);
+    setScheduleEntries(prev => prev.filter(e => e.id !== id));
+  }, [user]);
+
   return (
     <StudyContext.Provider value={{
-      subjects, topics, studySessions, reviews, studyCycle, userProfile, importedPresets, loading,
+      subjects, topics, studySessions, reviews, studyCycle, scheduleEntries, userProfile, importedPresets, loading,
       addSubject, updateSubject, removeSubject, addTopic, updateTopicStatus, removeTopic,
-      addStudySession, markReviewDone, importPreset, removePreset, generateCycle, updateProfile, refreshData,
+      addStudySession, markReviewDone, importPreset, removePreset, generateCycle,
+      updateProfile, addScheduleEntries, updateScheduleEntry, removeScheduleEntry, refreshData,
     }}>
       {children}
     </StudyContext.Provider>
