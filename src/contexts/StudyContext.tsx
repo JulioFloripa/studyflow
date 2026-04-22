@@ -114,7 +114,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('imported_presets').select('preset_id').eq('user_id', user.id),
         supabase.from('schedule_entries').select('*').eq('user_id', user.id).order('day_of_week'),
-        supabase.from('admin_presets').select('id, name, description, admin_preset_subjects(id, admin_preset_topics(id))').order('sort_order'),
+        supabase.from('admin_presets').select('id, name, description, admin_preset_subjects(id, admin_subjects(id, admin_topics(id)))').order('sort_order'),
       ]);
 
       if (subRes.data) setSubjects(subRes.data.map((s: any) => ({ id: s.id, name: s.name, priority: s.priority, color: s.color })));
@@ -159,7 +159,8 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (adminRes.data) setAdminPresets((adminRes.data as any[]).map(p => ({
         id: p.id, name: p.name, description: p.description || '',
         subjectCount: p.admin_preset_subjects?.length || 0,
-        topicCount: (p.admin_preset_subjects || []).reduce((s: number, sub: any) => s + (sub.admin_preset_topics?.length || 0), 0),
+        topicCount: (p.admin_preset_subjects || []).reduce((s: number, link: any) =>
+          s + (link.admin_subjects?.admin_topics?.length || 0), 0),
       })));
     } finally {
       setLoading(false);
@@ -406,23 +407,27 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!user) return;
     if (importedPresets.includes(presetId)) return;
 
-    const { data: subRows } = await supabase.from('admin_preset_subjects')
-      .select('*').eq('preset_id', presetId).order('sort_order');
-    if (!subRows) return;
+    // Busca disciplinas vinculadas ao edital com seus assuntos
+    const { data: linkRows } = await supabase.from('admin_preset_subjects')
+      .select('subject_id, admin_subjects(id, name, priority, color)')
+      .eq('preset_id', presetId).order('sort_order');
+    if (!linkRows || linkRows.length === 0) return;
 
-    const subjectInserts = subRows.map((s: any, idx: number) => ({
-      user_id: user.id, name: s.name, priority: s.priority,
-      color: s.color || SUBJECT_COLORS[(subjects.length + idx) % SUBJECT_COLORS.length],
+    const subjectInserts = (linkRows as any[]).map((row, idx) => ({
+      user_id: user.id,
+      name: row.admin_subjects.name,
+      priority: row.admin_subjects.priority,
+      color: row.admin_subjects.color || SUBJECT_COLORS[(subjects.length + idx) % SUBJECT_COLORS.length],
     }));
     const { data: subData } = await supabase.from('subjects').insert(subjectInserts as any).select();
     if (!subData) return;
 
     const topicInserts: any[] = [];
-    for (let i = 0; i < subRows.length; i++) {
+    for (let i = 0; i < linkRows.length; i++) {
       const dbSubject = subData[i];
       if (!dbSubject) continue;
-      const { data: topRows } = await supabase.from('admin_preset_topics')
-        .select('name').eq('subject_id', subRows[i].id).order('sort_order');
+      const { data: topRows } = await supabase.from('admin_topics')
+        .select('name').eq('subject_id', (linkRows as any[])[i].subject_id).order('sort_order');
       (topRows || []).forEach((t: any) => {
         topicInserts.push({ user_id: user.id, subject_id: dbSubject.id, name: t.name });
       });
