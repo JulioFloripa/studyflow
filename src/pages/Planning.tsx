@@ -22,7 +22,6 @@ import { useAuth } from '@/hooks/useAuth';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const DAY_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const STORAGE_KEY_CLASSES = 'ws_classes_v2';
 
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -51,18 +50,6 @@ function timeToMin(t: string): number {
   const [h, m] = t.split(':').map(Number); return h * 60 + m;
 }
 
-// Aulas salvas pela Agenda Semanal
-interface ClassEntry {
-  id: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  subjectId: string;
-  repeats: boolean;
-}
-function loadClasses(): ClassEntry[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY_CLASSES) || '[]'); } catch { return []; }
-}
 
 const SESSION_ICONS: Record<string, React.ReactNode> = {
   immediate_review: <RotateCcw size={12} />,
@@ -143,7 +130,7 @@ const StudyBlock: React.FC<{ slot: CycleSlot; isPostClass?: boolean }> = ({ slot
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const Planning: React.FC = () => {
   const { user } = useAuth();
-  const { subjects, topics, studySessions, userProfile, loading } = useStudy();
+  const { subjects, topics, studySessions, userProfile, loading, scheduleEntries } = useStudy();
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -160,23 +147,20 @@ const Planning: React.FC = () => {
   const isCurrentWeek = weekOffset === 0;
   const todayDow = new Date().getDay();
 
-  // Carregar aulas da Agenda Semanal
-  const classes = useMemo(() => loadClasses(), []);
-
-  // Construir hint de disciplinas por dia (aulas cadastradas)
+  // Hint de disciplinas por dia (apenas aulas cadastradas)
   const classDaySubjects = useMemo(() => {
     const map: Record<number, Set<string>> = {};
-    classes.forEach(c => {
+    scheduleEntries.filter(c => c.type === 'class').forEach(c => {
       if (!map[c.dayOfWeek]) map[c.dayOfWeek] = new Set();
       map[c.dayOfWeek].add(c.subjectId);
     });
     return map;
-  }, [classes]);
+  }, [scheduleEntries]);
 
   // Dados do onboarding
   const onboarding = useMemo(() => {
     const od = userProfile?.onboarding_data as Record<string, unknown> | undefined;
-    const savedStart = (od?.studyStartTime as string) || localStorage.getItem('plan_startTime') || '08:00';
+    const savedStart = (od?.studyStartTime as string) || userProfile.studyStartTime || '08:00';
     return {
       dailyHours: (od?.dailyHours as string) || '1to2',
       studyDays: (od?.studyDays as string[]) || ['seg', 'ter', 'qua', 'qui', 'sex'],
@@ -214,7 +198,8 @@ const Planning: React.FC = () => {
       return generateStudentCycle(
         user?.id || 'anon',
         userProfile?.full_name || 'Estudante',
-        onboarding, shuffled, topicsBySubject, difficultyTopics
+        onboarding, shuffled, topicsBySubject, difficultyTopics,
+        scheduleEntries
       );
     } catch { return null; }
   // eslint-disable-next-line react-hooks/exhaustive-deps

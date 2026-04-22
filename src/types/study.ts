@@ -55,6 +55,17 @@ export interface StudyCycleItem {
   order: number;
 }
 
+export interface ScheduleEntry {
+  id: string;
+  type: 'class' | 'sleep' | 'exercise';
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  subjectId: string;
+  label: string;
+  repeats: boolean;
+}
+
 export interface UserProfile {
   name: string;
   objective: string;
@@ -62,9 +73,13 @@ export interface UserProfile {
   examDate: string;
   availability: Record<string, number>;
   reviewIntervals: number[];
-  unlockedBadges?: string[]; // IDs dos badges desbloqueados
+  unlockedBadges?: string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onboarding_data?: Record<string, any>; // Dados brutos do onboarding (dailyHours, studyDays, etc.)
+  onboarding_data?: Record<string, any>;
+  studyStartTime?: string;
+  activeEditalId?: string;
+  wellnessDismissedAt?: number;
+  theme?: string;
 }
 
 export interface PresetExam {

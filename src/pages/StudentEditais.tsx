@@ -24,7 +24,6 @@ const border = 'hsl(var(--border))';
 const muted = 'hsl(var(--muted-foreground))';
 const primaryBlue = 'hsl(var(--primary))';
 const primaryGradient = 'var(--gradient-primary)';
-const ACTIVE_KEY = 'studyflow_active_edital';
 
 const COL_CONFIG: { type: ColType; label: string; color: string }[] = [
   { type: 'studied', label: 'Estudado',  color: primaryBlue },
@@ -97,7 +96,7 @@ function StatusDot({ active, color, loading, disabled, title, onClick }: StatusD
 
 // ─── Componente principal ─────────────────────────────────────────────
 const StudentEditais: React.FC = () => {
-  const { subjects, topics, studySessions, reviews, addStudySession, updateTopicStatus, addTopic, removePreset, loading } = useStudy();
+  const { subjects, topics, studySessions, reviews, addStudySession, updateTopicStatus, addTopic, removePreset, loading, userProfile, updateProfile } = useStudy();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const handleDeletePreset = async (presetId: string) => {
@@ -110,8 +109,7 @@ const StudentEditais: React.FC = () => {
     toast.success('Edital removido do seu plano.');
   };
 
-  const [activeExamId, setActiveExamId] = useState<string>(() =>
-    localStorage.getItem(ACTIVE_KEY) || presetExams[0]?.id || '');
+  const [activeExamId, setActiveExamId] = useState<string>('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Controle de loading por bolinha: key = "subjectName|topicName|colType"
   const [saving, setSaving] = useState<Set<string>>(new Set());
@@ -119,7 +117,16 @@ const StudentEditais: React.FC = () => {
   const activeExam = useMemo(() =>
     presetExams.find(e => e.id === activeExamId) || presetExams[0], [activeExamId]);
 
-  useEffect(() => { localStorage.setItem(ACTIVE_KEY, activeExamId); setExpanded(new Set()); }, [activeExamId]);
+  // Sincroniza activeExamId com o perfil do Supabase
+  useEffect(() => {
+    if (userProfile.activeEditalId) setActiveExamId(userProfile.activeEditalId);
+    else if (presetExams[0]?.id) setActiveExamId(presetExams[0].id);
+  }, [userProfile.activeEditalId]);
+
+  useEffect(() => {
+    setExpanded(new Set());
+    if (activeExamId) updateProfile({ activeEditalId: activeExamId });
+  }, [activeExamId]);
 
   // ── Lookup: topicName (lowercase) → topic do banco ──────────────────
   const topicByName = useMemo(() => {
