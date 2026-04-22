@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { subDays, format, startOfWeek, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Flame } from 'lucide-react';
+import { useTheme } from '@/hooks/useTheme';
 
 interface StudySession {
   date: string;
@@ -31,18 +32,30 @@ function getIntensity(minutes: number): number {
   return 4;
 }
 
-function getColor(intensity: number): string {
-  switch (intensity) {
-    case 0: return 'hsl(222 47% 13%)';
-    case 1: return 'hsl(217 91% 25%)';
-    case 2: return 'hsl(217 91% 40%)';
-    case 3: return 'hsl(217 91% 55%)';
-    case 4: return 'hsl(217 91% 70%)';
-    default: return 'hsl(222 47% 13%)';
+function getColor(intensity: number, isDark: boolean): string {
+  if (isDark) {
+    switch (intensity) {
+      case 0: return 'hsl(222 47% 13%)';
+      case 1: return 'hsl(217 91% 25%)';
+      case 2: return 'hsl(217 91% 40%)';
+      case 3: return 'hsl(217 91% 55%)';
+      case 4: return 'hsl(217 91% 70%)';
+      default: return 'hsl(222 47% 13%)';
+    }
+  } else {
+    switch (intensity) {
+      case 0: return 'hsl(142 30% 91%)';
+      case 1: return 'hsl(142 71% 72%)';
+      case 2: return 'hsl(142 71% 55%)';
+      case 3: return 'hsl(142 71% 42%)';
+      case 4: return 'hsl(142 71% 28%)';
+      default: return 'hsl(142 30% 91%)';
+    }
   }
 }
 
 export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => {
+  const { isDark } = useTheme();
   const today = useMemo(() => new Date(), []);
 
   // Mapa de data → minutos totais
@@ -132,21 +145,21 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
   const LABEL_W = 28; // largura da coluna de labels de dia
 
   return (
-    <Card style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 16%)' }} className="p-5">
+    <Card className="p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Flame className="h-4 w-4" style={{ color: 'hsl(217 91% 60%)' }} />
-          <h3 className="font-semibold text-white text-sm">Histórico de Estudos</h3>
+          <Flame className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold text-foreground text-sm">Histórico de Estudos</h3>
         </div>
         <div className="flex items-center gap-4">
           {streak > 0 && (
             <div className="flex items-center gap-1">
               <span className="text-base">🔥</span>
-              <span className="text-sm font-bold text-white">{streak} dias seguidos</span>
+              <span className="text-sm font-bold text-foreground">{streak} dias seguidos</span>
             </div>
           )}
-          <span className="text-xs" style={{ color: 'hsl(215 20% 50%)' }}>
+          <span className="text-xs text-muted-foreground">
             {totalDays} dias · {totalHours}h total
           </span>
         </div>
@@ -166,7 +179,7 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
                   style={{ width: CELL + GAP, flexShrink: 0, overflow: 'visible' }}
                 >
                   {label && (
-                    <span style={{ fontSize: 10, color: 'hsl(215 20% 48%)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
                       {label.label}
                     </span>
                   )}
@@ -196,7 +209,7 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
                       height: CELL,
                       lineHeight: `${CELL}px`,
                       fontSize: 9,
-                      color: 'hsl(215 20% 42%)',
+                      color: 'hsl(var(--muted-foreground))',
                       textAlign: 'right',
                       paddingRight: 4,
                     }}
@@ -235,7 +248,7 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
                       background:
                         cell.intensity < 0
                           ? 'transparent'
-                          : getColor(cell.intensity),
+                          : getColor(cell.intensity, isDark),
                       cursor: cell.minutes > 0 ? 'pointer' : 'default',
                       transition: 'opacity 0.15s',
                       flexShrink: 0,
@@ -257,7 +270,7 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
               justifyContent: 'flex-end',
             }}
           >
-            <span style={{ fontSize: 10, color: 'hsl(215 20% 42%)', marginRight: 2 }}>Menos</span>
+            <span style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginRight: 2 }}>Menos</span>
             {[0, 1, 2, 3, 4].map(i => (
               <div
                 key={i}
@@ -265,11 +278,11 @@ export const StudyHeatmap: React.FC<StudyHeatmapProps> = ({ studySessions }) => 
                   width: CELL,
                   height: CELL,
                   borderRadius: 3,
-                  background: getColor(i),
+                  background: getColor(i, isDark),
                 }}
               />
             ))}
-            <span style={{ fontSize: 10, color: 'hsl(215 20% 42%)', marginLeft: 2 }}>Mais</span>
+            <span style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginLeft: 2 }}>Mais</span>
           </div>
         </div>
       </div>

@@ -37,9 +37,9 @@ const Auth = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ background: 'hsl(222 47% 6%)' }}>
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))' }}>
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'var(--gradient-primary)' }}>
             <BookOpen className="h-5 w-5 text-white" />
           </div>
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -87,39 +87,36 @@ const Auth = () => {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: 'radial-gradient(ellipse at top, hsl(222 47% 10%) 0%, hsl(222 47% 5%) 70%)' }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-4 gradient-bg">
       <div
         className="fixed top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, hsl(217 91% 60% / 0.08) 0%, transparent 70%)', filter: 'blur(40px)' }}
+        style={{ background: 'radial-gradient(circle, hsl(var(--primary) / 0.08) 0%, transparent 70%)', filter: 'blur(40px)' }}
       />
 
       <div className="w-full max-w-sm relative z-10">
         <div className="flex flex-col items-center gap-3 mb-8 animate-fade-in-up">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))', boxShadow: '0 0 20px hsl(217 91% 60% / 0.3)' }}
+            style={{ background: 'var(--gradient-primary)', boxShadow: '0 0 20px hsl(var(--primary) / 0.3)' }}
           >
             <BookOpen className="h-7 w-7 text-white" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white tracking-tight">StudyFlow</h1>
-            <p className="text-sm" style={{ color: 'hsl(215 20% 55%)' }}>Organize seus estudos com inteligência</p>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">StudyFlow</h1>
+            <p className="text-sm text-muted-foreground">Organize seus estudos com inteligência</p>
           </div>
         </div>
 
-        <div
-          className="rounded-2xl p-6 animate-fade-in-up delay-100"
-          style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 16%)', boxShadow: '0 25px 50px -12px hsl(0 0% 0% / 0.5)' }}
-        >
-          <div className="flex rounded-xl p-1 mb-6" style={{ background: 'hsl(222 47% 6%)' }}>
+        <div className="rounded-2xl p-6 animate-fade-in-up delay-100 bg-card border border-border shadow-2xl">
+          <div className="flex rounded-xl p-1 mb-6 bg-background">
             <button
               type="button"
               onClick={() => setIsLogin(true)}
               className="flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-              style={{ background: isLogin ? 'hsl(222 47% 14%)' : 'transparent', color: isLogin ? 'hsl(210 40% 98%)' : 'hsl(215 20% 55%)' }}
+              style={{
+                background: isLogin ? 'hsl(var(--muted))' : 'transparent',
+                color: isLogin ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+              }}
             >
               Entrar
             </button>
@@ -127,7 +124,10 @@ const Auth = () => {
               type="button"
               onClick={() => setIsLogin(false)}
               className="flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-              style={{ background: !isLogin ? 'hsl(222 47% 14%)' : 'transparent', color: !isLogin ? 'hsl(210 40% 98%)' : 'hsl(215 20% 55%)' }}
+              style={{
+                background: !isLogin ? 'hsl(var(--muted))' : 'transparent',
+                color: !isLogin ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+              }}
             >
               Cadastrar
             </button>
@@ -136,20 +136,19 @@ const Auth = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-1.5">
-                <Label htmlFor="name" className="text-sm font-medium" style={{ color: 'hsl(215 20% 70%)' }}>Nome completo</Label>
+                <Label htmlFor="name" className="text-sm font-medium text-muted-foreground">Nome completo</Label>
                 <Input
                   id="name"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Seu nome"
                   className="h-11 rounded-xl"
-                  style={{ background: 'hsl(222 47% 12%)', border: '1px solid hsl(222 47% 20%)', color: 'hsl(210 40% 98%)' }}
                 />
               </div>
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-sm font-medium" style={{ color: 'hsl(215 20% 70%)' }}>E-mail</Label>
+              <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">E-mail</Label>
               <div className="relative">
                 <Input
                   id="email"
@@ -159,17 +158,15 @@ const Auth = () => {
                   placeholder="seu@email.com"
                   className="h-11 rounded-xl pr-10"
                   style={{
-                    background: 'hsl(222 47% 12%)',
-                    border: (!isLogin && email && isFlemingEmail) ? '1px solid hsl(142 71% 45%)' : '1px solid hsl(222 47% 20%)',
-                    color: 'hsl(210 40% 98%)',
+                    borderColor: (!isLogin && email && isFlemingEmail) ? 'hsl(var(--success))' : undefined,
                   }}
                 />
                 {!isLogin && email && isFlemingEmail && (
-                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-check-bounce" style={{ color: 'hsl(142 71% 45%)' }} />
+                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-check-bounce text-success" />
                 )}
               </div>
               {!isLogin && email && isFlemingEmail && (
-                <p className="text-xs flex items-center gap-1.5 animate-fade-in" style={{ color: 'hsl(142 71% 45%)' }}>
+                <p className="text-xs flex items-center gap-1.5 animate-fade-in text-success">
                   <CheckCircle2 className="h-3 w-3" /> Aluno Fleming — acesso gratuito!
                 </p>
               )}
@@ -181,7 +178,7 @@ const Auth = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm font-medium" style={{ color: 'hsl(215 20% 70%)' }}>Senha</Label>
+              <Label htmlFor="password" className="text-sm font-medium text-muted-foreground">Senha</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -190,13 +187,11 @@ const Auth = () => {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="h-11 rounded-xl pr-10"
-                  style={{ background: 'hsl(222 47% 12%)', border: '1px solid hsl(222 47% 20%)', color: 'hsl(210 40% 98%)' }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: 'hsl(215 20% 55%)' }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -208,8 +203,7 @@ const Auth = () => {
                 <button
                   type="button"
                   onClick={() => { setForgotEmail(email); setShowForgot(true); setForgotSent(false); }}
-                  className="text-xs transition-colors hover:underline"
-                  style={{ color: 'hsl(217 91% 60%)' }}
+                  className="text-xs transition-colors hover:underline text-primary"
                 >
                   Esqueci minha senha
                 </button>
@@ -224,31 +218,30 @@ const Auth = () => {
                 onClick={() => setShowForgot(false)}
               >
                 <div
-                  className="w-full max-w-sm rounded-2xl p-6"
-                  style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 20%)' }}
+                  className="w-full max-w-sm rounded-2xl p-6 bg-card border border-border"
                   onClick={e => e.stopPropagation()}
                 >
                   {forgotSent ? (
                     <div className="text-center">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'hsl(142 71% 45% / 0.15)' }}>
-                        <CheckCircle2 className="h-6 w-6" style={{ color: 'hsl(142 71% 45%)' }} />
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'hsl(var(--success) / 0.15)' }}>
+                        <CheckCircle2 className="h-6 w-6 text-success" />
                       </div>
-                      <h3 className="font-semibold text-white mb-2">E-mail enviado!</h3>
-                      <p className="text-sm mb-4" style={{ color: 'hsl(215 20% 55%)' }}>
-                        Verifique sua caixa de entrada em <strong className="text-white">{forgotEmail}</strong> e clique no link para redefinir sua senha.
+                      <h3 className="font-semibold text-foreground mb-2">E-mail enviado!</h3>
+                      <p className="text-sm mb-4 text-muted-foreground">
+                        Verifique sua caixa de entrada em <strong className="text-foreground">{forgotEmail}</strong> e clique no link para redefinir sua senha.
                       </p>
                       <button
                         onClick={() => setShowForgot(false)}
                         className="w-full py-2.5 rounded-xl text-sm font-medium text-white"
-                        style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))' }}
+                        style={{ background: 'var(--gradient-primary)' }}
                       >
                         Fechar
                       </button>
                     </div>
                   ) : (
                     <>
-                      <h3 className="font-semibold text-white mb-1">Recuperar senha</h3>
-                      <p className="text-sm mb-4" style={{ color: 'hsl(215 20% 55%)' }}>
+                      <h3 className="font-semibold text-foreground mb-1">Recuperar senha</h3>
+                      <p className="text-sm mb-4 text-muted-foreground">
                         Informe seu e-mail e enviaremos um link para redefinir sua senha.
                       </p>
                       <Input
@@ -257,14 +250,12 @@ const Auth = () => {
                         onChange={e => setForgotEmail(e.target.value)}
                         placeholder="seu@email.com"
                         className="h-11 rounded-xl mb-3"
-                        style={{ background: 'hsl(222 47% 12%)', border: '1px solid hsl(222 47% 20%)', color: 'hsl(210 40% 98%)' }}
                         onKeyDown={e => e.key === 'Enter' && handleForgotPassword()}
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={() => setShowForgot(false)}
-                          className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-                          style={{ border: '1px solid hsl(222 47% 20%)', color: 'hsl(215 20% 55%)' }}
+                          className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground"
                         >
                           Cancelar
                         </button>
@@ -272,7 +263,7 @@ const Auth = () => {
                           onClick={handleForgotPassword}
                           disabled={forgotLoading}
                           className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white flex items-center justify-center gap-2"
-                          style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))' }}
+                          style={{ background: 'var(--gradient-primary)' }}
                         >
                           {forgotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar link'}
                         </button>
@@ -285,9 +276,9 @@ const Auth = () => {
 
             <Button
               type="submit"
-              className="w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 mt-2 transition-all duration-200"
+              className="w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 mt-2 transition-all duration-200 text-white"
               disabled={submitting}
-              style={{ background: 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))', color: 'white', boxShadow: '0 0 20px hsl(217 91% 60% / 0.3)', border: 'none' }}
+              style={{ background: 'var(--gradient-primary)', boxShadow: '0 0 20px hsl(var(--primary) / 0.3)', border: 'none' }}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                 <>{isLogin ? 'Entrar na conta' : 'Criar conta grátis'} <ArrowRight className="h-4 w-4" /></>
@@ -296,9 +287,9 @@ const Auth = () => {
           </form>
 
           {!isLogin && (
-            <p className="text-center text-xs mt-4" style={{ color: 'hsl(215 20% 45%)' }}>
+            <p className="text-center text-xs mt-4 text-muted-foreground">
               Ao criar sua conta, você concorda com nossos{' '}
-              <span className="underline cursor-pointer" style={{ color: 'hsl(217 91% 60%)' }}>Termos de Uso</span>
+              <span className="underline cursor-pointer text-primary">Termos de Uso</span>
             </p>
           )}
         </div>
@@ -312,11 +303,10 @@ const Auth = () => {
             ].map((item) => (
               <div
                 key={item.text}
-                className="flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl text-center"
-                style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 16%)' }}
+                className="flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl text-center bg-card border border-border"
               >
                 <span className="text-lg">{item.emoji}</span>
-                <span className="text-xs font-medium" style={{ color: 'hsl(215 20% 60%)' }}>{item.text}</span>
+                <span className="text-xs font-medium text-muted-foreground">{item.text}</span>
               </div>
             ))}
           </div>

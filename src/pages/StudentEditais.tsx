@@ -19,11 +19,11 @@ interface TopicState {
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────
-const cardBg = 'hsl(222 47% 9%)';
-const border = 'hsl(222 47% 16%)';
-const muted = 'hsl(215 20% 50%)';
-const primaryBlue = 'hsl(217 91% 60%)';
-const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
+const cardBg = 'hsl(var(--card))';
+const border = 'hsl(var(--border))';
+const muted = 'hsl(var(--muted-foreground))';
+const primaryBlue = 'hsl(var(--primary))';
+const primaryGradient = 'var(--gradient-primary)';
 const ACTIVE_KEY = 'studyflow_active_edital';
 
 const COL_CONFIG: { type: ColType; label: string; color: string }[] = [
@@ -35,7 +35,7 @@ const COL_CONFIG: { type: ColType; label: string; color: string }[] = [
 
 function getSubjectColor(name: string): string {
   const map: [string, string][] = [
-    ['Matem', 'hsl(217 91% 60%)'],
+    ['Matem', 'hsl(var(--primary))'],
     ['Física', 'hsl(280 80% 65%)'],
     ['Quím', 'hsl(142 71% 45%)'],
     ['Biolog', 'hsl(160 60% 45%)'],
@@ -78,7 +78,7 @@ function StatusDot({ active, color, loading, disabled, title, onClick }: StatusD
       className="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1"
       style={{
         background: active ? color : 'transparent',
-        border: `2px solid ${active ? color : 'hsl(222 47% 28%)'}`,
+        border: `2px solid ${active ? color : 'hsl(var(--border))'}`,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.35 : 1,
         boxShadow: active ? `0 0 8px ${color}60` : 'none',
@@ -331,7 +331,7 @@ const StudentEditais: React.FC = () => {
                     background: activeExamId === exam.id ? primaryGradient : cardBg,
                     border: `1px solid ${activeExamId === exam.id ? 'transparent' : border}`,
                     color: activeExamId === exam.id ? 'white' : muted,
-                    boxShadow: activeExamId === exam.id ? '0 0 16px hsl(217 91% 60% / 0.25)' : 'none',
+                    boxShadow: activeExamId === exam.id ? '0 0 16px hsl(var(--primary) / 0.25)' : 'none',
                   }}
                 >
                   {activeExamId === exam.id && <Pin className="h-3.5 w-3.5" />}
@@ -378,7 +378,7 @@ const StudentEditais: React.FC = () => {
             <BookOpen className="h-4 w-4" style={{ color: primaryBlue }} />
             Seu Progresso — {activeExam.name}
           </h2>
-          <Badge style={{ background: 'hsl(217 91% 60% / 0.15)', color: primaryBlue, border: `1px solid hsl(217 91% 60% / 0.3)` }}>
+          <Badge style={{ background: 'hsl(var(--primary) / 0.15)', color: primaryBlue, border: `1px solid hsl(var(--primary) / 0.3)` }}>
             {globalStats.total} tópicos
           </Badge>
         </div>
@@ -393,7 +393,7 @@ const StudentEditais: React.FC = () => {
                   {pct(item.value)}% ({item.value}/{globalStats.total})
                 </span>
               </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'hsl(222 47% 14%)' }}>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'hsl(var(--muted))' }}>
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct(item.value)}%`, background: item.color }}
@@ -447,7 +447,7 @@ const StudentEditais: React.FC = () => {
                   });
                 }}
                 className="w-full flex items-center justify-between px-4 py-3.5 transition-all"
-                style={{ background: isOpen ? 'hsl(222 47% 12%)' : cardBg }}
+                style={{ background: isOpen ? 'hsl(var(--muted))' : cardBg }}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
@@ -461,7 +461,7 @@ const StudentEditais: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                   <div className="hidden sm:flex items-center gap-2">
-                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(222 47% 18%)' }}>
+                    <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(var(--border))' }}>
                       <div className="h-full rounded-full transition-all" style={{ width: `${subPct}%`, background: color }} />
                     </div>
                     <span className="text-xs font-medium" style={{ color }}>{subPct}%</span>
@@ -475,7 +475,7 @@ const StudentEditais: React.FC = () => {
 
               {/* Lista de tópicos */}
               {isOpen && (
-                <div style={{ background: 'hsl(222 47% 7%)' }}>
+                <div style={{ background: 'hsl(var(--background))' }}>
                   {/* Cabeçalho das colunas */}
                   <div
                     className="flex items-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wider"
@@ -503,14 +503,14 @@ const StudentEditais: React.FC = () => {
                         key={topic}
                         className="flex items-center px-4 py-2.5"
                         style={{
-                          background: idx % 2 === 0 ? 'hsl(222 47% 7%)' : 'hsl(222 47% 8.5%)',
-                          borderBottom: idx < subject.topics.length - 1 ? `1px solid hsl(222 47% 12%)` : 'none',
+                          background: idx % 2 === 0 ? 'hsl(var(--background))' : 'hsl(var(--card))',
+                          borderBottom: idx < subject.topics.length - 1 ? `1px solid hsl(var(--border))` : 'none',
                         }}
                       >
                         {/* Nome do tópico */}
                         <span
                           className="flex-1 text-sm pr-4 leading-snug"
-                          style={{ color: state.studied ? 'hsl(215 20% 55%)' : 'hsl(215 20% 80%)' }}
+                          style={{ color: state.studied ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))' }}
                         >
                           {idx + 1}. {topic}
                         </span>
@@ -567,7 +567,7 @@ const StudentEditais: React.FC = () => {
           </div>
         ))}
       </div>
-      <p className="text-xs text-center mt-3" style={{ color: 'hsl(222 47% 30%)' }}>
+      <p className="text-xs text-center mt-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
         Revisões 1D, 7D e 30D são agendadas automaticamente ao marcar "Estudado" e concluídas na tela de Revisões.
       </p>
     </div>

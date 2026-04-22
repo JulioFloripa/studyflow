@@ -9,12 +9,6 @@ import { toast } from 'sonner';
 import { useStudy } from '@/contexts/StudyContext';
 import { presetExams } from '@/data/presetExams';
 
-const cardBg = 'hsl(222 47% 9%)';
-const border = 'hsl(222 47% 16%)';
-const muted = 'hsl(215 20% 50%)';
-const primaryBlue = 'hsl(217 91% 60%)';
-const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
-
 const DAY_LABELS: Record<string, string> = {
   seg: 'Seg', ter: 'Ter', qua: 'Qua', qui: 'Qui', sex: 'Sex', sab: 'Sáb', dom: 'Dom',
 };
@@ -83,8 +77,8 @@ const MyPlan: React.FC = () => {
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-white">Meu Plano</h1>
-        <p className="mt-1 text-sm" style={{ color: muted }}>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Meu Plano</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Atualize seu edital, disponibilidade e metas a qualquer momento
         </p>
       </div>
@@ -92,26 +86,26 @@ const MyPlan: React.FC = () => {
       {/* Resumo atual */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { icon: Clock, label: 'Horas/semana', value: `${totalWeeklyHours}h`, color: primaryBlue },
+          { icon: Clock, label: 'Horas/semana', value: `${totalWeeklyHours}h`, color: 'hsl(var(--primary))' },
           { icon: BookOpen, label: 'Disciplinas', value: subjects.length.toString(), color: 'hsl(142 71% 45%)' },
           { icon: Target, label: 'Meta semanal', value: `${weeklyGoal}h`, color: 'hsl(280 80% 65%)' },
           { icon: Calendar, label: 'Dias p/ prova', value: daysUntilExam !== null ? `${daysUntilExam}d` : '—', color: 'hsl(35 90% 55%)' },
         ].map(item => (
-          <Card key={item.label} className="p-3 text-center" style={{ background: cardBg, border: `1px solid ${border}` }}>
+          <Card key={item.label} className="p-3 text-center">
             <item.icon className="h-4 w-4 mx-auto mb-1" style={{ color: item.color }} />
-            <p className="text-lg font-bold text-white">{item.value}</p>
-            <p className="text-[10px]" style={{ color: muted }}>{item.label}</p>
+            <p className="text-lg font-bold text-foreground">{item.value}</p>
+            <p className="text-[10px] text-muted-foreground">{item.label}</p>
           </Card>
         ))}
       </div>
 
       {/* Seção: Edital */}
-      <Card className="mb-4 p-5" style={{ background: cardBg, border: `1px solid ${border}` }}>
-        <h2 className="font-semibold text-white mb-1 flex items-center gap-2">
-          <Pin className="h-4 w-4" style={{ color: primaryBlue }} />
+      <Card className="mb-4 p-5">
+        <h2 className="font-semibold text-foreground mb-1 flex items-center gap-2">
+          <Pin className="h-4 w-4 text-primary" />
           Edital / Prova
         </h2>
-        <p className="text-xs mb-4" style={{ color: muted }}>
+        <p className="text-xs mb-4 text-muted-foreground">
           Importe um edital para adicionar todas as disciplinas e tópicos ao seu plano automaticamente.
         </p>
 
@@ -124,21 +118,21 @@ const MyPlan: React.FC = () => {
             return (
               <div
                 key={exam.id}
-                className="flex items-center justify-between p-3 rounded-xl"
+                className="flex items-center justify-between p-3 rounded-xl border"
                 style={{
-                  background: imported ? 'hsl(217 91% 60% / 0.08)' : 'hsl(222 47% 12%)',
-                  border: `1px solid ${imported ? 'hsl(217 91% 60% / 0.3)' : border}`,
+                  background: imported ? 'hsl(var(--primary) / 0.08)' : 'hsl(var(--muted))',
+                  borderColor: imported ? 'hsl(var(--primary) / 0.3)' : 'hsl(var(--border))',
                 }}
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-sm text-white">{exam.name}</p>
-                  <p className="text-xs mt-0.5" style={{ color: muted }}>
+                  <p className="font-medium text-sm text-foreground">{exam.name}</p>
+                  <p className="text-xs mt-0.5 text-muted-foreground">
                     {exam.subjects.length} disciplinas · {exam.subjects.reduce((a, s) => a + s.topics.length, 0)} tópicos
                   </p>
                 </div>
                 <div className="flex-shrink-0 ml-3">
                   {imported ? (
-                    <Badge style={{ background: 'hsl(217 91% 60% / 0.15)', color: primaryBlue, border: `1px solid hsl(217 91% 60% / 0.3)` }}>
+                    <Badge style={{ background: 'hsl(var(--primary) / 0.15)', color: 'hsl(var(--primary))', border: '1px solid hsl(var(--primary) / 0.3)' }}>
                       ✓ Importado
                     </Badge>
                   ) : isConfirming ? (
@@ -146,8 +140,8 @@ const MyPlan: React.FC = () => {
                       <span className="text-xs" style={{ color: 'hsl(35 90% 65%)' }}>Confirmar?</span>
                       <Button
                         size="sm"
-                        className="h-7 text-xs px-2"
-                        style={{ background: primaryGradient, color: 'white', border: 'none' }}
+                        className="h-7 text-xs px-2 text-white"
+                        style={{ background: 'var(--gradient-primary)', border: 'none' }}
                         onClick={() => handleImportPreset(exam.id)}
                         disabled={isImporting}
                       >
@@ -155,8 +149,7 @@ const MyPlan: React.FC = () => {
                       </Button>
                       <Button
                         size="sm" variant="ghost"
-                        className="h-7 text-xs px-2"
-                        style={{ color: muted }}
+                        className="h-7 text-xs px-2 text-muted-foreground"
                         onClick={() => setShowImportConfirm(null)}
                       >
                         Não
@@ -166,7 +159,7 @@ const MyPlan: React.FC = () => {
                     <Button
                       size="sm" variant="ghost"
                       className="h-7 text-xs"
-                      style={{ color: primaryBlue, border: `1px solid hsl(217 91% 60% / 0.3)` }}
+                      style={{ color: 'hsl(var(--primary))', border: '1px solid hsl(var(--primary) / 0.3)' }}
                       onClick={() => setShowImportConfirm(exam.id)}
                     >
                       Importar
@@ -189,36 +182,37 @@ const MyPlan: React.FC = () => {
       </Card>
 
       {/* Seção: Disponibilidade */}
-      <Card className="mb-4 p-5" style={{ background: cardBg, border: `1px solid ${border}` }}>
-        <h2 className="font-semibold text-white mb-1 flex items-center gap-2">
+      <Card className="mb-4 p-5">
+        <h2 className="font-semibold text-foreground mb-1 flex items-center gap-2">
           <Clock className="h-4 w-4" style={{ color: 'hsl(142 71% 45%)' }} />
           Disponibilidade Diária
         </h2>
-        <p className="text-xs mb-4" style={{ color: muted }}>
+        <p className="text-xs mb-4 text-muted-foreground">
           Horas disponíveis para estudo em cada dia da semana (0–12h)
         </p>
         <div className="grid grid-cols-7 gap-2">
           {DAYS.map(day => (
             <div key={day} className="text-center">
-              <p className="text-xs font-medium mb-1.5" style={{ color: muted }}>{DAY_LABELS[day]}</p>
+              <p className="text-xs font-medium mb-1.5 text-muted-foreground">{DAY_LABELS[day]}</p>
               <div className="flex flex-col items-center gap-1">
                 <button
                   onClick={() => updateDay(day, (availability[day] || 0) + 0.5)}
-                  className="w-full h-6 rounded text-xs font-bold transition-colors"
-                  style={{ background: 'hsl(222 47% 16%)', color: muted }}
+                  className="w-full h-6 rounded text-xs font-bold transition-colors bg-secondary text-muted-foreground hover:bg-accent"
                 >
                   +
                 </button>
                 <div
-                  className="w-full py-1.5 rounded text-center text-sm font-bold text-white"
-                  style={{ background: (availability[day] || 0) > 0 ? 'hsl(217 91% 60% / 0.2)' : 'hsl(222 47% 14%)', border: `1px solid ${(availability[day] || 0) > 0 ? 'hsl(217 91% 60% / 0.4)' : border}` }}
+                  className="w-full py-1.5 rounded text-center text-sm font-bold text-foreground border"
+                  style={{
+                    background: (availability[day] || 0) > 0 ? 'hsl(var(--primary) / 0.1)' : 'hsl(var(--muted))',
+                    borderColor: (availability[day] || 0) > 0 ? 'hsl(var(--primary) / 0.4)' : 'hsl(var(--border))',
+                  }}
                 >
                   {availability[day] || 0}h
                 </div>
                 <button
                   onClick={() => updateDay(day, (availability[day] || 0) - 0.5)}
-                  className="w-full h-6 rounded text-xs font-bold transition-colors"
-                  style={{ background: 'hsl(222 47% 16%)', color: muted }}
+                  className="w-full h-6 rounded text-xs font-bold transition-colors bg-secondary text-muted-foreground hover:bg-accent"
                 >
                   −
                 </button>
@@ -226,20 +220,20 @@ const MyPlan: React.FC = () => {
             </div>
           ))}
         </div>
-        <p className="text-xs mt-3 text-right font-medium" style={{ color: primaryBlue }}>
+        <p className="text-xs mt-3 text-right font-medium text-primary">
           Total: {totalWeeklyHours}h/semana
         </p>
       </Card>
 
       {/* Seção: Metas */}
-      <Card className="mb-6 p-5" style={{ background: cardBg, border: `1px solid ${border}` }}>
-        <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
+      <Card className="mb-6 p-5">
+        <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
           <Target className="h-4 w-4" style={{ color: 'hsl(280 80% 65%)' }} />
           Metas e Objetivo
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="text-xs" style={{ color: muted }}>Objetivo Principal</Label>
+            <Label className="text-xs text-muted-foreground">Objetivo Principal</Label>
             <div className="flex flex-wrap gap-2">
               {OBJECTIVES.map(obj => (
                 <button
@@ -247,9 +241,9 @@ const MyPlan: React.FC = () => {
                   onClick={() => setObjective(obj.value)}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                   style={{
-                    background: objective === obj.value ? primaryGradient : 'hsl(222 47% 14%)',
-                    border: `1px solid ${objective === obj.value ? 'transparent' : border}`,
-                    color: objective === obj.value ? 'white' : muted,
+                    background: objective === obj.value ? 'var(--gradient-primary)' : 'hsl(var(--muted))',
+                    border: `1px solid ${objective === obj.value ? 'transparent' : 'hsl(var(--border))'}`,
+                    color: objective === obj.value ? 'white' : 'hsl(var(--muted-foreground))',
                   }}
                 >
                   {obj.label}
@@ -259,23 +253,19 @@ const MyPlan: React.FC = () => {
           </div>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs" style={{ color: muted }}>Meta Semanal (horas)</Label>
+              <Label className="text-xs text-muted-foreground">Meta Semanal (horas)</Label>
               <Input
                 type="number" min="1" max="80"
                 value={weeklyGoal}
                 onChange={e => setWeeklyGoal(parseInt(e.target.value) || 0)}
-                className="text-white"
-                style={{ background: 'hsl(222 47% 14%)', border: `1px solid ${border}` }}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs" style={{ color: muted }}>Data da Prova</Label>
+              <Label className="text-xs text-muted-foreground">Data da Prova</Label>
               <Input
                 type="date"
                 value={examDate}
                 onChange={e => setExamDate(e.target.value)}
-                className="text-white"
-                style={{ background: 'hsl(222 47% 14%)', border: `1px solid ${border}` }}
               />
             </div>
           </div>
@@ -286,8 +276,8 @@ const MyPlan: React.FC = () => {
       <Button
         onClick={handleSave}
         disabled={saving}
-        className="w-full h-12 text-base font-semibold"
-        style={{ background: primaryGradient, color: 'white', border: 'none' }}
+        className="w-full h-12 text-base font-semibold text-white"
+        style={{ background: 'var(--gradient-primary)', border: 'none' }}
       >
         {saving
           ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
