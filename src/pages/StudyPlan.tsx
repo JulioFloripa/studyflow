@@ -24,7 +24,7 @@ const statusColors: Record<TopicStatus, string> = {
 };
 
 const StudyPlan = () => {
-  const { subjects, topics, addSubject, updateSubject, removeSubject, addTopic, removeTopic, updateTopicStatus, importPreset, importedPresets, refreshData } = useStudy();
+  const { subjects, topics, addSubject, updateSubject, removeSubject, addTopic, removeTopic, updateTopicStatus, importPreset, importAdminPreset, importedPresets, adminPresets, refreshData } = useStudy();
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
@@ -159,6 +159,37 @@ const StudyPlan = () => {
         </TabsList>
 
         <TabsContent value="preset" className="space-y-4">
+          {adminPresets.length > 0 && (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Editais do sistema</p>
+              {adminPresets.map(preset => {
+                const alreadyImported = importedPresets.includes(preset.id);
+                return (
+                  <Card key={preset.id} className="p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="font-semibold text-foreground text-lg">{preset.name}</h3>
+                        {preset.description && <p className="text-sm text-muted-foreground mt-1">{preset.description}</p>}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {preset.subjectCount} disciplinas · {preset.topicCount} assuntos
+                        </p>
+                      </div>
+                      {alreadyImported ? (
+                        <Badge variant="secondary" className="flex-shrink-0 gap-1">
+                          <Check className="h-3 w-3" /> Importado
+                        </Badge>
+                      ) : (
+                        <Button onClick={async () => { await importAdminPreset(preset.id); }} size="sm" className="flex-shrink-0">
+                          <Download className="h-4 w-4 mr-1" /> Importar
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+              {presetExams.length > 0 && <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-2">Editais padrão</p>}
+            </>
+          )}
           {presetExams.map(preset => {
             const alreadyImported = importedPresets.includes(preset.id);
             return (

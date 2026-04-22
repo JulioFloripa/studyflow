@@ -22,6 +22,7 @@ import StudentEditais from "@/pages/StudentEditais";
 import Timer from "@/pages/Timer";
 import MyPlan from "@/pages/MyPlan";
 import WeeklySchedule from "@/pages/WeeklySchedule";
+import Admin from "@/pages/Admin";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "@/pages/ResetPassword";
 import { BookOpen } from "lucide-react";
@@ -61,6 +62,9 @@ const App = () => (
 
               {/* Onboarding — protegido mas fora do Layout */}
               <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+
+              {/* Admin — protegido mas fora do Layout */}
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
 
               {/* Rotas protegidas do estudante */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

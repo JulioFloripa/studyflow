@@ -6,6 +6,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { calculateNextReview, getReviewType, type EaseFactor } from '@/lib/spacedRepetition';
 import { localDateStr, addDaysLocal } from '@/lib/dateUtils';
 
+export interface AdminPresetItem {
+  id: string;
+  name: string;
+  description: string;
+  subjectCount: number;
+  topicCount: number;
+}
+
 interface StudyContextType {
   subjects: Subject[];
   topics: Topic[];
@@ -15,6 +23,7 @@ interface StudyContextType {
   scheduleEntries: ScheduleEntry[];
   userProfile: UserProfile;
   importedPresets: string[];
+  adminPresets: AdminPresetItem[];
   loading: boolean;
   addSubject: (name: string, priority?: number, color?: string) => Promise<void>;
   updateSubject: (id: string, changes: Partial<Pick<Subject, 'name' | 'priority' | 'color'>>) => Promise<void>;
@@ -31,6 +40,7 @@ interface StudyContextType {
   addScheduleEntries: (entries: Omit<ScheduleEntry, 'id'>[]) => Promise<void>;
   updateScheduleEntry: (id: string, changes: Partial<Omit<ScheduleEntry, 'id'>>) => Promise<void>;
   removeScheduleEntry: (id: string) => Promise<void>;
+  importAdminPreset: (presetId: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -60,6 +70,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [importedPresets, setImportedPresets] = useState<string[]>([]);
+  const [adminPresets, setAdminPresets] = useState<AdminPresetItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Atualiza dados sem ativar o spinner de loading (usado após salvar sessões)
@@ -94,7 +105,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!user) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [subRes, topRes, sessRes, revRes, cycRes, profRes, impRes, schedRes] = await Promise.all([
+      const [subRes, topRes, sessRes, revRes, cycRes, profRes, impRes, schedRes, adminRes] = await Promise.all([
         supabase.from('subjects').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('topics').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('study_sessions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
@@ -103,6 +114,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('imported_presets').select('preset_id').eq('user_id', user.id),
         supabase.from('schedule_entries').select('*').eq('user_id', user.id).order('day_of_week'),
+        supabase.from('admin_presets').select('id, name, description, admin_preset_subjects(id, admin_preset_topics(id))').order('sort_order'),
       ]);
 
       if (subRes.data) setSubjects(subRes.data.map((s: any) => ({ id: s.id, name: s.name, priority: s.priority, color: s.color })));
@@ -143,6 +155,11 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         id: e.id, type: e.type, dayOfWeek: e.day_of_week,
         startTime: e.start_time, endTime: e.end_time,
         subjectId: e.subject_id || '', label: e.label || '', repeats: e.repeats,
+      })));
+      if (adminRes.data) setAdminPresets((adminRes.data as any[]).map(p => ({
+        id: p.id, name: p.name, description: p.description || '',
+        subjectCount: p.admin_preset_subjects?.length || 0,
+        topicCount: (p.admin_preset_subjects || []).reduce((s: number, sub: any) => s + (sub.admin_preset_topics?.length || 0), 0),
       })));
     } finally {
       setLoading(false);
@@ -385,12 +402,44 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setScheduleEntries(prev => prev.filter(e => e.id !== id));
   }, [user]);
 
+  const importAdminPreset = useCallback(async (presetId: string) => {
+    if (!user) return;
+    if (importedPresets.includes(presetId)) return;
+
+    const { data: subRows } = await supabase.from('admin_preset_subjects')
+      .select('*').eq('preset_id', presetId).order('sort_order');
+    if (!subRows) return;
+
+    const subjectInserts = subRows.map((s: any, idx: number) => ({
+      user_id: user.id, name: s.name, priority: s.priority,
+      color: s.color || SUBJECT_COLORS[(subjects.length + idx) % SUBJECT_COLORS.length],
+    }));
+    const { data: subData } = await supabase.from('subjects').insert(subjectInserts as any).select();
+    if (!subData) return;
+
+    const topicInserts: any[] = [];
+    for (let i = 0; i < subRows.length; i++) {
+      const dbSubject = subData[i];
+      if (!dbSubject) continue;
+      const { data: topRows } = await supabase.from('admin_preset_topics')
+        .select('name').eq('subject_id', subRows[i].id).order('sort_order');
+      (topRows || []).forEach((t: any) => {
+        topicInserts.push({ user_id: user.id, subject_id: dbSubject.id, name: t.name });
+      });
+    }
+    if (topicInserts.length > 0) await supabase.from('topics').insert(topicInserts as any);
+
+    await supabase.from('imported_presets').insert({ user_id: user.id, preset_id: presetId } as any);
+    setImportedPresets(prev => [...prev, presetId]);
+    await refreshData();
+  }, [user, importedPresets, subjects.length, refreshData]);
+
   return (
     <StudyContext.Provider value={{
-      subjects, topics, studySessions, reviews, studyCycle, scheduleEntries, userProfile, importedPresets, loading,
+      subjects, topics, studySessions, reviews, studyCycle, scheduleEntries, userProfile, importedPresets, adminPresets, loading,
       addSubject, updateSubject, removeSubject, addTopic, updateTopicStatus, removeTopic,
       addStudySession, markReviewDone, importPreset, removePreset, generateCycle,
-      updateProfile, addScheduleEntries, updateScheduleEntry, removeScheduleEntry, refreshData,
+      updateProfile, addScheduleEntries, updateScheduleEntry, removeScheduleEntry, importAdminPreset, refreshData,
     }}>
       {children}
     </StudyContext.Provider>
