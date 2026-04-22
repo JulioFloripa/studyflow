@@ -148,6 +148,8 @@ const Planning: React.FC = () => {
   const todayDow = new Date().getDay();
 
   // Hint de disciplinas por dia (apenas aulas cadastradas)
+  const classes = useMemo(() => scheduleEntries.filter(e => e.type === 'class'), [scheduleEntries]);
+
   const classDaySubjects = useMemo(() => {
     const map: Record<number, Set<string>> = {};
     scheduleEntries.filter(c => c.type === 'class').forEach(c => {
