@@ -10,6 +10,7 @@ import { Plus, Trash2, ChevronDown, ChevronRight, Download, BookOpen, Check, Pen
 import { TopicStatus } from '@/types/study';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { presetExams } from '@/data/presetExams';
 
 const statusLabels: Record<TopicStatus, string> = {
   not_started: 'Não iniciado',
@@ -23,7 +24,7 @@ const statusColors: Record<TopicStatus, string> = {
 };
 
 const StudyPlan = () => {
-  const { subjects, topics, addSubject, updateSubject, removeSubject, addTopic, removeTopic, updateTopicStatus, importAdminPreset, importedPresets, adminPresets, refreshData } = useStudy();
+  const { subjects, topics, addSubject, updateSubject, removeSubject, addTopic, removeTopic, updateTopicStatus, importAdminPreset, importPreset, importedPresets, adminPresets, refreshData } = useStudy();
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newTopicName, setNewTopicName] = useState('');
@@ -149,13 +150,8 @@ const StudyPlan = () => {
         </TabsList>
 
         <TabsContent value="preset" className="space-y-4">
-          {adminPresets.length === 0 ? (
-            <Card className="p-12 text-center">
-              <Download className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">Nenhum edital disponível.</p>
-              <p className="text-sm text-muted-foreground mt-1">O administrador ainda não cadastrou editais.</p>
-            </Card>
-          ) : adminPresets.map(preset => {
+          {/* Editais gerenciados pelo admin */}
+          {adminPresets.map(preset => {
             const alreadyImported = importedPresets.includes(preset.id);
             return (
               <Card key={preset.id} className="p-5">
@@ -173,6 +169,37 @@ const StudyPlan = () => {
                     </Badge>
                   ) : (
                     <Button onClick={async () => { await importAdminPreset(preset.id); toast.success('Edital importado!'); }} size="sm" className="flex-shrink-0">
+                      <Download className="h-4 w-4 mr-1" /> Importar
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+
+          {/* Editais padrão (sempre disponíveis) */}
+          {presetExams.map(preset => {
+            const alreadyImported = importedPresets.includes(preset.id);
+            const totalTopics = preset.subjects.reduce((s, sub) => s + sub.topics.length, 0);
+            return (
+              <Card key={preset.id} className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-foreground text-lg">{preset.name}</h3>
+                      <Badge variant="outline" className="text-[10px] py-0">Padrão</Badge>
+                    </div>
+                    {preset.description && <p className="text-sm text-muted-foreground mt-1">{preset.description}</p>}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {preset.subjects.length} disciplinas · {totalTopics} assuntos
+                    </p>
+                  </div>
+                  {alreadyImported ? (
+                    <Badge variant="secondary" className="flex-shrink-0 gap-1">
+                      <Check className="h-3 w-3" /> Importado
+                    </Badge>
+                  ) : (
+                    <Button onClick={async () => { await importPreset(preset.id); toast.success('Edital importado!'); }} size="sm" className="flex-shrink-0">
                       <Download className="h-4 w-4 mr-1" /> Importar
                     </Button>
                   )}
