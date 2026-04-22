@@ -286,7 +286,7 @@ const Planning: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 no-print">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Target size={24} style={{ color: '#3b82f6' }} />
+              <Target size={24} style={{ color: 'hsl(var(--primary))' }} />
               Plano de Estudos
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
@@ -304,7 +304,7 @@ const Planning: React.FC = () => {
             <button
               onClick={() => window.print()}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors"
-              style={{ background: '#3b82f6' }}
+              style={{ background: 'var(--gradient-primary)' }}
             >
               <Printer size={14} /> Imprimir
             </button>
@@ -325,12 +325,12 @@ const Planning: React.FC = () => {
               {fmtDate(weekDates[0])} – {fmtDate(weekDates[6])}
             </div>
             {isCurrentWeek && (
-              <div className="text-xs font-medium" style={{ color: '#3b82f6' }}>Semana atual</div>
+              <div className="text-xs font-medium" style={{ color: 'hsl(var(--primary))' }}>Semana atual</div>
             )}
           </div>
           <div className="flex items-center gap-2">
             {!isCurrentWeek && (
-              <button onClick={() => setWeekOffset(0)} className="text-xs hover:underline px-2" style={{ color: '#3b82f6' }}>
+              <button onClick={() => setWeekOffset(0)} className="text-xs hover:underline px-2" style={{ color: 'hsl(var(--primary))' }}>
                 Hoje
               </button>
             )}
@@ -362,7 +362,7 @@ const Planning: React.FC = () => {
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
-              { label: 'Total semanal', value: fmtHours(stats.totalMin), icon: <Clock size={18} />, color: '#3b82f6' },
+              { label: 'Total semanal', value: fmtHours(stats.totalMin), icon: <Clock size={18} />, color: 'hsl(var(--primary))' },
               { label: 'Revisão Ativa', value: fmtHours(stats.reviewMin), icon: <RotateCcw size={18} />, color: '#a855f7' },
               { label: 'Conteúdo Novo', value: fmtHours(stats.newContentMin), icon: <BookOpen size={18} />, color: '#06b6d4' },
               { label: 'Exercícios', value: fmtHours(stats.practiceMin), icon: <Star size={18} />, color: '#f59e0b' },
@@ -388,9 +388,9 @@ const Planning: React.FC = () => {
         {cycleResult && cycleResult.recommendations.length > 0 && (
           <div
             className="rounded-xl p-4 mb-6 border print-card"
-            style={{ background: '#3b82f615', borderColor: '#3b82f630' }}
+            style={{ background: 'hsl(var(--primary) / 0.06)', borderColor: 'hsl(var(--primary) / 0.2)' }}
           >
-            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: '#3b82f6' }}>
+            <h3 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: 'hsl(var(--primary))' }}>
               <TrendingUp size={14} /> Recomendações do algoritmo
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
@@ -420,8 +420,8 @@ const Planning: React.FC = () => {
                 className="rounded-xl border overflow-hidden print-card"
                 style={{
                   background: 'var(--bg-secondary)',
-                  borderColor: isToday ? '#3b82f6' : 'var(--border-color)',
-                  boxShadow: isToday ? '0 0 0 1px #3b82f6' : 'none',
+                  borderColor: isToday ? 'hsl(var(--primary))' : 'var(--border-color)',
+                  boxShadow: isToday ? '0 0 0 1px hsl(var(--primary))' : 'none',
                 }}
               >
                 {/* Cabeçalho do dia */}
@@ -429,12 +429,12 @@ const Planning: React.FC = () => {
                   className="px-4 py-3 border-b"
                   style={{
                     borderColor: 'var(--border-color)',
-                    background: isToday ? '#3b82f610' : 'transparent',
+                    background: isToday ? 'hsl(var(--primary) / 0.06)' : 'transparent',
                   }}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-bold print-header" style={{ color: isToday ? '#3b82f6' : 'var(--text-primary)' }}>
+                      <div className="font-bold print-header" style={{ color: isToday ? 'hsl(var(--primary))' : 'var(--text-primary)' }}>
                         {DAY_FULL[dow]}
                       </div>
                       <div className="text-xs print-muted" style={{ color: 'var(--text-secondary)' }}>
@@ -449,7 +449,7 @@ const Planning: React.FC = () => {
                         </div>
                       )}
                       {classTotalMin > 0 && (
-                        <div className="text-xs" style={{ color: '#3b82f6' }}>
+                        <div className="text-xs" style={{ color: 'hsl(var(--primary))' }}>
                           {fmtHours(classTotalMin)} aula
                         </div>
                       )}
@@ -461,12 +461,12 @@ const Planning: React.FC = () => {
                   {/* Blocos de aula (fixos) */}
                   {dayClasses.length > 0 && (
                     <div className="mb-2">
-                      <div className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#3b82f6' }}>
+                      <div className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'hsl(var(--primary))' }}>
                         Aulas
                       </div>
                       {dayClasses.map(c => {
                         const subject = subjects.find(s => s.id === c.subjectId);
-                        const color = subject?.color || '#3b82f6';
+                        const color = subject?.color || 'hsl(var(--primary))';
                         const dur = timeToMin(c.endTime) - timeToMin(c.startTime);
                         return (
                           <div
@@ -528,7 +528,7 @@ const Planning: React.FC = () => {
             style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
           >
             <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 print-header" style={{ color: 'var(--text-primary)' }}>
-              <BarChart2 size={16} style={{ color: '#3b82f6' }} />
+              <BarChart2 size={16} style={{ color: 'hsl(var(--primary))' }} />
               Distribuição semanal por disciplina
             </h3>
             <div className="space-y-3">
@@ -549,7 +549,7 @@ const Planning: React.FC = () => {
                             {subject.name}
                           </span>
                           {hasClass && (
-                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: '#3b82f615', color: '#3b82f6' }}>
+                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'hsl(var(--primary) / 0.08)', color: 'hsl(var(--primary))' }}>
                               tem aula
                             </span>
                           )}

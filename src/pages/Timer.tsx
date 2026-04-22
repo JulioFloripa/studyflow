@@ -16,12 +16,6 @@ type TimerState = 'idle' | 'running' | 'paused' | 'break';
 const POMODORO_WORK = 25 * 60;   // 25 minutos
 const POMODORO_BREAK = 5 * 60;   // 5 minutos
 
-const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
-const bg = 'hsl(222 47% 6%)';
-const cardBg = 'hsl(222 47% 9%)';
-const border = 'hsl(222 47% 16%)';
-const muted = 'hsl(215 20% 50%)';
-
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
   const s = (seconds % 60).toString().padStart(2, '0');
@@ -98,14 +92,12 @@ const Timer = () => {
             if (s <= 1) {
               playBeep();
               if (!isBreak) {
-                // Trabalho terminou → pausa
                 setIsBreak(true);
                 setPomodoroCount(c => c + 1);
                 setSessionMinutes(m => m + 25);
                 toast.success('Pomodoro concluído! Hora de descansar 5 minutos.');
                 return POMODORO_BREAK;
               } else {
-                // Pausa terminou → trabalho
                 setIsBreak(false);
                 toast.info('Pausa encerrada! Vamos estudar!');
                 return POMODORO_WORK;
@@ -145,28 +137,25 @@ const Timer = () => {
 
   if (focusMode && state === 'running') {
     return (
-      <div
-        className="fixed inset-0 flex flex-col items-center justify-center z-50"
-        style={{ background: bg }}
-      >
+      <div className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-background">
         {/* Disciplina */}
         <div className="mb-8 text-center">
           <div className="flex items-center gap-2 justify-center mb-1">
-            <div className="w-3 h-3 rounded-full" style={{ background: selectedSubject?.color || 'hsl(217 91% 60%)' }} />
-            <span className="text-white font-semibold text-lg">{selectedSubject?.name}</span>
+            <div className="w-3 h-3 rounded-full" style={{ background: selectedSubject?.color || 'hsl(var(--primary))' }} />
+            <span className="text-foreground font-semibold text-lg">{selectedSubject?.name}</span>
           </div>
-          <p style={{ color: muted }} className="text-sm">{selectedTopic?.name}</p>
+          <p className="text-muted-foreground text-sm">{selectedTopic?.name}</p>
         </div>
 
         {/* Timer grande */}
         <div className="relative flex items-center justify-center mb-8">
           <svg width="220" height="220" className="-rotate-90">
-            <circle cx="110" cy="110" r="90" fill="none" stroke="hsl(222 47% 14%)" strokeWidth="8" />
+            <circle cx="110" cy="110" r="90" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
             {mode === 'pomodoro' && (
               <circle
                 cx="110" cy="110" r="90"
                 fill="none"
-                stroke={isBreak ? 'hsl(142 71% 45%)' : 'hsl(217 91% 60%)'}
+                stroke={isBreak ? 'hsl(var(--success))' : 'hsl(var(--primary))'}
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
@@ -176,11 +165,11 @@ const Timer = () => {
             )}
           </svg>
           <div className="absolute text-center">
-            <p className="text-6xl font-bold text-white font-mono tracking-tight">
+            <p className="text-6xl font-bold text-foreground font-mono tracking-tight">
               {mode === 'free' ? formatTime(seconds) : formatTime(pomodoroSeconds)}
             </p>
             {mode === 'pomodoro' && (
-              <p className="text-sm mt-1" style={{ color: isBreak ? 'hsl(142 71% 45%)' : muted }}>
+              <p className="text-sm mt-1" style={{ color: isBreak ? 'hsl(var(--success))' : 'hsl(var(--muted-foreground))' }}>
                 {isBreak ? '☕ Pausa' : `🍅 Pomodoro #${pomodoroCount + 1}`}
               </p>
             )}
@@ -192,16 +181,15 @@ const Timer = () => {
           <Button
             size="lg"
             onClick={handlePause}
-            className="h-14 px-8 rounded-2xl text-white font-semibold"
-            style={{ background: 'hsl(222 47% 14%)', border: `1px solid ${border}` }}
+            className="h-14 px-8 rounded-2xl font-semibold bg-muted text-foreground border border-border"
           >
             {state === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
           </Button>
           <Button
             size="lg"
             onClick={handleStop}
-            className="h-14 px-8 rounded-2xl text-white font-semibold"
-            style={{ background: primaryGradient, border: 'none', boxShadow: '0 0 20px hsl(217 91% 60% / 0.3)' }}
+            className="h-14 px-8 rounded-2xl font-semibold text-white"
+            style={{ background: 'var(--gradient-primary)', border: 'none', boxShadow: '0 0 20px hsl(var(--primary) / 0.3)' }}
           >
             <Square className="h-5 w-5 mr-2" /> Finalizar
           </Button>
@@ -209,8 +197,7 @@ const Timer = () => {
 
         <button
           onClick={() => setFocusMode(false)}
-          className="mt-8 flex items-center gap-1 text-sm"
-          style={{ color: muted }}
+          className="mt-8 flex items-center gap-1 text-sm text-muted-foreground"
         >
           <Minimize2 className="h-4 w-4" /> Sair do Modo Foco
         </button>
@@ -221,17 +208,17 @@ const Timer = () => {
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-white">Cronômetro de Estudos</h1>
-        <p style={{ color: muted }} className="mt-1 text-sm">Registre seu tempo de estudo automaticamente</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Cronômetro de Estudos</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Registre seu tempo de estudo automaticamente</p>
       </div>
 
-      <Card style={{ background: cardBg, border: `1px solid ${border}` }} className="p-6">
+      <Card className="p-6">
         {/* Seleção de disciplina e assunto */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           <div>
-            <Label className="text-xs mb-1.5 block" style={{ color: muted }}>Disciplina</Label>
+            <Label className="text-xs mb-1.5 block text-muted-foreground">Disciplina</Label>
             <Select value={subjectId} onValueChange={v => { setSubjectId(v); setTopicId(''); }} disabled={state !== 'idle'}>
-              <SelectTrigger style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}`, color: 'white' }}>
+              <SelectTrigger>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
@@ -247,9 +234,9 @@ const Timer = () => {
             </Select>
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block" style={{ color: muted }}>Assunto</Label>
+            <Label className="text-xs mb-1.5 block text-muted-foreground">Assunto</Label>
             <Select value={topicId} onValueChange={setTopicId} disabled={!subjectId || state !== 'idle'}>
-              <SelectTrigger style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}`, color: 'white' }}>
+              <SelectTrigger>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
@@ -262,18 +249,18 @@ const Timer = () => {
         </div>
 
         {/* Modo: Livre ou Pomodoro */}
-        <div className="flex items-center gap-4 mb-6 p-3 rounded-xl" style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}>
+        <div className="flex items-center gap-4 mb-6 p-3 rounded-xl bg-muted border border-border">
           <button
             onClick={() => { if (state === 'idle') { setMode('free'); setSeconds(0); } }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'free' ? 'text-white' : ''}`}
-            style={mode === 'free' ? { background: primaryGradient } : { color: muted }}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'free' ? 'text-white' : 'text-muted-foreground'}`}
+            style={mode === 'free' ? { background: 'var(--gradient-primary)' } : {}}
           >
             <Zap className="h-4 w-4 inline mr-1" /> Livre
           </button>
           <button
             onClick={() => { if (state === 'idle') { setMode('pomodoro'); setPomodoroSeconds(POMODORO_WORK); } }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'pomodoro' ? 'text-white' : ''}`}
-            style={mode === 'pomodoro' ? { background: primaryGradient } : { color: muted }}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'pomodoro' ? 'text-white' : 'text-muted-foreground'}`}
+            style={mode === 'pomodoro' ? { background: 'var(--gradient-primary)' } : {}}
           >
             <Coffee className="h-4 w-4 inline mr-1" /> Pomodoro
           </button>
@@ -283,12 +270,12 @@ const Timer = () => {
         <div className="flex flex-col items-center mb-6">
           <div className="relative flex items-center justify-center mb-4">
             <svg width="180" height="180" className="-rotate-90">
-              <circle cx="90" cy="90" r="75" fill="none" stroke="hsl(222 47% 14%)" strokeWidth="6" />
+              <circle cx="90" cy="90" r="75" fill="none" stroke="hsl(var(--muted))" strokeWidth="6" />
               {mode === 'pomodoro' && (
                 <circle
                   cx="90" cy="90" r="75"
                   fill="none"
-                  stroke={isBreak ? 'hsl(142 71% 45%)' : 'hsl(217 91% 60%)'}
+                  stroke={isBreak ? 'hsl(var(--success))' : 'hsl(var(--primary))'}
                   strokeWidth="6"
                   strokeLinecap="round"
                   strokeDasharray={circumference * 75 / 90}
@@ -298,11 +285,11 @@ const Timer = () => {
               )}
             </svg>
             <div className="absolute text-center">
-              <p className="text-5xl font-bold text-white font-mono tracking-tight">
+              <p className="text-5xl font-bold text-foreground font-mono tracking-tight">
                 {mode === 'free' ? formatTime(seconds) : formatTime(pomodoroSeconds)}
               </p>
               {mode === 'pomodoro' && (
-                <p className="text-xs mt-1" style={{ color: isBreak ? 'hsl(142 71% 45%)' : muted }}>
+                <p className="text-xs mt-1" style={{ color: isBreak ? 'hsl(var(--success))' : 'hsl(var(--muted-foreground))' }}>
                   {isBreak ? '☕ Pausa' : `🍅 #${pomodoroCount + 1}`}
                 </p>
               )}
@@ -312,7 +299,7 @@ const Timer = () => {
           {mode === 'pomodoro' && pomodoroCount > 0 && (
             <div className="flex gap-1 mb-2">
               {Array.from({ length: pomodoroCount }).map((_, i) => (
-                <div key={i} className="w-2 h-2 rounded-full" style={{ background: 'hsl(217 91% 60%)' }} />
+                <div key={i} className="w-2 h-2 rounded-full bg-primary" />
               ))}
             </div>
           )}
@@ -323,7 +310,7 @@ const Timer = () => {
           {state === 'idle' ? (
             <Button
               className="flex-1 h-12 rounded-xl font-semibold text-white"
-              style={{ background: primaryGradient, border: 'none', boxShadow: '0 0 16px hsl(217 91% 60% / 0.25)' }}
+              style={{ background: 'var(--gradient-primary)', border: 'none', boxShadow: '0 0 16px hsl(var(--primary) / 0.25)' }}
               onClick={handleStart}
             >
               <Play className="h-5 w-5 mr-2" /> Iniciar
@@ -331,8 +318,7 @@ const Timer = () => {
           ) : (
             <>
               <Button
-                className="flex-1 h-12 rounded-xl font-semibold text-white"
-                style={{ background: 'hsl(222 47% 14%)', border: `1px solid ${border}` }}
+                className="flex-1 h-12 rounded-xl font-semibold text-foreground bg-muted border border-border"
                 onClick={handlePause}
               >
                 {state === 'running' ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
@@ -340,14 +326,13 @@ const Timer = () => {
               </Button>
               <Button
                 className="flex-1 h-12 rounded-xl font-semibold text-white"
-                style={{ background: primaryGradient, border: 'none' }}
+                style={{ background: 'var(--gradient-primary)', border: 'none' }}
                 onClick={handleStop}
               >
                 <Square className="h-4 w-4 mr-2" /> Finalizar
               </Button>
               <Button
-                className="h-12 w-12 rounded-xl"
-                style={{ background: 'hsl(222 47% 14%)', border: `1px solid ${border}`, color: muted }}
+                className="h-12 w-12 rounded-xl bg-muted border border-border text-muted-foreground"
                 onClick={handleReset}
                 title="Resetar sem salvar"
               >
@@ -358,12 +343,12 @@ const Timer = () => {
         </div>
 
         {/* Modo Foco */}
-        <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}>
+        <div className="flex items-center justify-between p-3 rounded-xl bg-muted border border-border">
           <div className="flex items-center gap-2">
-            <Maximize2 className="h-4 w-4" style={{ color: 'hsl(217 91% 60%)' }} />
+            <Maximize2 className="h-4 w-4 text-primary" />
             <div>
-              <p className="text-sm font-medium text-white">Modo Foco</p>
-              <p className="text-xs" style={{ color: muted }}>Tela minimalista sem distrações</p>
+              <p className="text-sm font-medium text-foreground">Modo Foco</p>
+              <p className="text-xs text-muted-foreground">Tela minimalista sem distrações</p>
             </div>
           </div>
           <Switch
@@ -375,7 +360,7 @@ const Timer = () => {
 
         {/* Dica */}
         {state === 'idle' && (
-          <p className="text-xs text-center mt-4" style={{ color: muted }}>
+          <p className="text-xs text-center mt-4 text-muted-foreground">
             Ao finalizar, a sessão é registrada automaticamente no seu histórico.
           </p>
         )}
@@ -383,16 +368,16 @@ const Timer = () => {
 
       {/* Estatísticas do dia */}
       {subjects.length > 0 && (
-        <Card className="mt-4 p-5" style={{ background: cardBg, border: `1px solid ${border}` }}>
-          <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-            <BookOpen className="h-4 w-4" style={{ color: 'hsl(217 91% 60%)' }} />
+        <Card className="mt-4 p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-primary" />
             Como usar o cronômetro
           </h3>
-          <div className="space-y-2 text-xs" style={{ color: muted }}>
+          <div className="space-y-2 text-xs text-muted-foreground">
             <p>1. Selecione a disciplina e o assunto que vai estudar.</p>
-            <p>2. Escolha o modo <strong className="text-white">Livre</strong> (tempo livre) ou <strong className="text-white">Pomodoro</strong> (25min estudo + 5min pausa).</p>
-            <p>3. Ative o <strong className="text-white">Modo Foco</strong> para uma tela sem distrações.</p>
-            <p>4. Ao clicar em <strong className="text-white">Finalizar</strong>, o tempo é salvo automaticamente no seu histórico.</p>
+            <p>2. Escolha o modo <strong className="text-foreground">Livre</strong> (tempo livre) ou <strong className="text-foreground">Pomodoro</strong> (25min estudo + 5min pausa).</p>
+            <p>3. Ative o <strong className="text-foreground">Modo Foco</strong> para uma tela sem distrações.</p>
+            <p>4. Ao clicar em <strong className="text-foreground">Finalizar</strong>, o tempo é salvo automaticamente no seu histórico.</p>
           </div>
         </Card>
       )}

@@ -52,11 +52,9 @@ const REVIEW_TYPES = [
 ];
 
 const TOTAL_STEPS = 6;
-const bgStyle = { background: 'radial-gradient(ellipse at top, hsl(222 47% 10%) 0%, hsl(222 47% 5%) 70%)' };
-const cardStyle = { background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 16%)' };
-const mutedColor = 'hsl(215 20% 55%)';
-const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
-const primaryGlow = '0 0 20px hsl(217 91% 60% / 0.3)';
+const mutedColor = 'hsl(var(--muted-foreground))';
+const primaryGradient = 'var(--gradient-primary)';
+const primaryGlow = '0 0 20px hsl(var(--primary) / 0.3)';
 
 const Onboarding = () => {
   const { user } = useAuth();
@@ -134,25 +132,25 @@ const Onboarding = () => {
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: primaryGradient, boxShadow: primaryGlow }}>
                 <GraduationCap className="h-7 w-7 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Bem-vindo ao StudyFlow!</h2>
+              <h2 className="text-2xl font-bold text-foreground">Bem-vindo ao StudyFlow!</h2>
               <p style={{ color: mutedColor }} className="text-sm">Vamos criar seu plano de estudos personalizado em menos de 2 minutos.</p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white">Qual e a sua idade?</label>
+              <label className="text-sm font-medium text-foreground">Qual e a sua idade?</label>
               <div className="flex items-center gap-4">
                 <input
                   type="range" min={14} max={60} value={data.age}
                   onChange={e => setData(prev => ({ ...prev, age: Number(e.target.value) }))}
                   className="flex-1 accent-blue-500"
                 />
-                <span className="text-2xl font-bold text-white w-12 text-center">{data.age}</span>
+                <span className="text-2xl font-bold text-foreground w-12 text-center">{data.age}</span>
               </div>
               <div className="flex justify-between text-xs" style={{ color: mutedColor }}>
                 <span>14 anos</span><span>60 anos</span>
               </div>
             </div>
-            <div className="rounded-xl p-4 text-center" style={{ background: 'hsl(217 91% 60% / 0.08)', border: '1px solid hsl(217 91% 60% / 0.2)' }}>
-              <p className="text-xs" style={{ color: 'hsl(217 91% 70%)' }}>
+            <div className="rounded-xl p-4 text-center" style={{ background: 'hsl(var(--primary) / 0.08)', border: '1px solid hsl(var(--primary) / 0.2)' }}>
+              <p className="text-xs" style={{ color: 'hsl(var(--primary))' }}>
                 Seu plano sera totalmente adaptado ao seu perfil e disponibilidade.
               </p>
             </div>
@@ -163,7 +161,7 @@ const Onboarding = () => {
         return (
           <div className="space-y-5 animate-fade-in-up">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-white">Quanto tempo voce tem para estudar?</h2>
+              <h2 className="text-2xl font-bold text-foreground">Quanto tempo voce tem para estudar?</h2>
               <p style={{ color: mutedColor }} className="text-sm">Seja honesto — consistencia vale mais que quantidade.</p>
             </div>
             <div className="space-y-2.5">
@@ -173,16 +171,16 @@ const Onboarding = () => {
                   onClick={() => setData(prev => ({ ...prev, dailyHours: opt.id }))}
                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left"
                   style={{
-                    background: data.dailyHours === opt.id ? 'hsl(217 91% 60% / 0.15)' : 'hsl(222 47% 12%)',
-                    border: data.dailyHours === opt.id ? '1px solid hsl(217 91% 60%)' : '1px solid hsl(222 47% 20%)',
+                    background: data.dailyHours === opt.id ? 'hsl(var(--primary) / 0.15)' : 'hsl(var(--muted))',
+                    border: data.dailyHours === opt.id ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--border))',
                   }}
                 >
-                  <Clock className="h-4 w-4 flex-shrink-0" style={{ color: data.dailyHours === opt.id ? 'hsl(217 91% 60%)' : 'hsl(215 20% 55%)' }} />
+                  <Clock className="h-4 w-4 flex-shrink-0" style={{ color: data.dailyHours === opt.id ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }} />
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: data.dailyHours === opt.id ? 'hsl(217 91% 60%)' : 'hsl(210 40% 98%)' }}>{opt.label}</p>
+                    <p className="text-sm font-semibold" style={{ color: data.dailyHours === opt.id ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}>{opt.label}</p>
                     <p className="text-xs" style={{ color: mutedColor }}>{opt.sub}</p>
                   </div>
-                  {data.dailyHours === opt.id && <CheckCircle2 className="h-4 w-4 ml-auto flex-shrink-0" style={{ color: 'hsl(217 91% 60%)' }} />}
+                  {data.dailyHours === opt.id && <CheckCircle2 className="h-4 w-4 ml-auto flex-shrink-0" style={{ color: 'hsl(var(--primary))' }} />}
                 </button>
               ))}
             </div>
@@ -193,7 +191,7 @@ const Onboarding = () => {
         return (
           <div className="space-y-4 animate-fade-in-up">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-white">Para qual prova voce esta estudando?</h2>
+              <h2 className="text-2xl font-bold text-foreground">Para qual prova voce esta estudando?</h2>
               <p style={{ color: mutedColor }} className="text-sm">Vamos importar automaticamente as disciplinas e conteudos do edital.</p>
             </div>
             {/* Search */}
@@ -205,7 +203,7 @@ const Onboarding = () => {
                 value={searchExam}
                 onChange={e => setSearchExam(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-white outline-none"
-                style={{ background: 'hsl(222 47% 12%)', border: '1px solid hsl(222 47% 20%)' }}
+                style={{ background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))' }}
               />
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
@@ -215,23 +213,23 @@ const Onboarding = () => {
                   onClick={() => setData(prev => ({ ...prev, examId: exam.id }))}
                   className="w-full flex items-start gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left"
                   style={{
-                    background: data.examId === exam.id ? 'hsl(217 91% 60% / 0.15)' : 'hsl(222 47% 12%)',
-                    border: data.examId === exam.id ? '1px solid hsl(217 91% 60%)' : '1px solid hsl(222 47% 20%)',
+                    background: data.examId === exam.id ? 'hsl(var(--primary) / 0.15)' : 'hsl(var(--muted))',
+                    border: data.examId === exam.id ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--border))',
                   }}
                 >
-                  <BookOpen className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: data.examId === exam.id ? 'hsl(217 91% 60%)' : 'hsl(215 20% 55%)' }} />
+                  <BookOpen className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: data.examId === exam.id ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: data.examId === exam.id ? 'hsl(217 91% 60%)' : 'hsl(210 40% 98%)' }}>{exam.name}</p>
+                    <p className="text-sm font-semibold" style={{ color: data.examId === exam.id ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}>{exam.name}</p>
                     {exam.description && <p className="text-xs truncate" style={{ color: mutedColor }}>{exam.description}</p>}
-                    <p className="text-xs mt-0.5" style={{ color: 'hsl(217 91% 50%)' }}>{exam.subjects.length} disciplinas</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'hsl(var(--primary))' }}>{exam.subjects.length} disciplinas</p>
                   </div>
-                  {data.examId === exam.id && <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'hsl(217 91% 60%)' }} />}
+                  {data.examId === exam.id && <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'hsl(var(--primary))' }} />}
                 </button>
               ))}
             </div>
             {selectedExam && (
-              <div className="rounded-xl p-3" style={{ background: 'hsl(217 91% 60% / 0.08)', border: '1px solid hsl(217 91% 60% / 0.2)' }}>
-                <p className="text-xs font-medium" style={{ color: 'hsl(217 91% 70%)' }}>
+              <div className="rounded-xl p-3" style={{ background: 'hsl(var(--primary) / 0.08)', border: '1px solid hsl(var(--primary) / 0.2)' }}>
+                <p className="text-xs font-medium" style={{ color: 'hsl(var(--primary))' }}>
                   Disciplinas que serao importadas: {selectedExam.subjects.map(s => s.name).join(', ')}
                 </p>
               </div>
@@ -243,7 +241,7 @@ const Onboarding = () => {
         return (
           <div className="space-y-5 animate-fade-in-up">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-white">Quais dias voce estuda?</h2>
+              <h2 className="text-2xl font-bold text-foreground">Quais dias voce estuda?</h2>
               <p style={{ color: mutedColor }} className="text-sm">Selecione os dias que voce tem disponibilidade.</p>
             </div>
             <div className="grid grid-cols-7 gap-1.5">
@@ -255,11 +253,11 @@ const Onboarding = () => {
                     onClick={() => toggleDay(day.id)}
                     className="flex flex-col items-center py-3 rounded-xl transition-all duration-200"
                     style={{
-                      background: active ? 'hsl(217 91% 60% / 0.2)' : 'hsl(222 47% 12%)',
-                      border: active ? '1px solid hsl(217 91% 60%)' : '1px solid hsl(222 47% 20%)',
+                      background: active ? 'hsl(var(--primary) / 0.2)' : 'hsl(var(--muted))',
+                      border: active ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--border))',
                     }}
                   >
-                    <span className="text-[10px] font-bold" style={{ color: active ? 'hsl(217 91% 60%)' : mutedColor }}>{day.full}</span>
+                    <span className="text-[10px] font-bold" style={{ color: active ? 'hsl(var(--primary))' : mutedColor }}>{day.full}</span>
                   </button>
                 );
               })}
@@ -274,7 +272,7 @@ const Onboarding = () => {
         return (
           <div className="space-y-5 animate-fade-in-up">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-white">Qual e o seu maior desafio?</h2>
+              <h2 className="text-2xl font-bold text-foreground">Qual e o seu maior desafio?</h2>
               <p style={{ color: mutedColor }} className="text-sm">Vamos adaptar sua estrategia de estudos para isso.</p>
             </div>
             <div className="space-y-2.5">
@@ -286,16 +284,16 @@ const Onboarding = () => {
                     onClick={() => setData(prev => ({ ...prev, profile: opt.id }))}
                     className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left"
                     style={{
-                      background: data.profile === opt.id ? 'hsl(217 91% 60% / 0.15)' : 'hsl(222 47% 12%)',
-                      border: data.profile === opt.id ? '1px solid hsl(217 91% 60%)' : '1px solid hsl(222 47% 20%)',
+                      background: data.profile === opt.id ? 'hsl(var(--primary) / 0.15)' : 'hsl(var(--muted))',
+                      border: data.profile === opt.id ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--border))',
                     }}
                   >
-                    <Icon className="h-4 w-4 flex-shrink-0" style={{ color: data.profile === opt.id ? 'hsl(217 91% 60%)' : 'hsl(215 20% 55%)' }} />
+                    <Icon className="h-4 w-4 flex-shrink-0" style={{ color: data.profile === opt.id ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }} />
                     <div>
-                      <p className="text-sm font-semibold" style={{ color: data.profile === opt.id ? 'hsl(217 91% 60%)' : 'hsl(210 40% 98%)' }}>{opt.label}</p>
+                      <p className="text-sm font-semibold" style={{ color: data.profile === opt.id ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}>{opt.label}</p>
                       <p className="text-xs" style={{ color: mutedColor }}>{opt.sub}</p>
                     </div>
-                    {data.profile === opt.id && <CheckCircle2 className="h-4 w-4 ml-auto flex-shrink-0" style={{ color: 'hsl(217 91% 60%)' }} />}
+                    {data.profile === opt.id && <CheckCircle2 className="h-4 w-4 ml-auto flex-shrink-0" style={{ color: 'hsl(var(--primary))' }} />}
                   </button>
                 );
               })}
@@ -307,7 +305,7 @@ const Onboarding = () => {
         return (
           <div className="space-y-5 animate-fade-in-up">
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-white">Como voce prefere revisar?</h2>
+              <h2 className="text-2xl font-bold text-foreground">Como voce prefere revisar?</h2>
               <p style={{ color: mutedColor }} className="text-sm">As revisoes serao agendadas automaticamente apos cada sessao de estudo.</p>
             </div>
             <div className="space-y-2.5">
@@ -317,16 +315,16 @@ const Onboarding = () => {
                   onClick={() => setData(prev => ({ ...prev, reviewType: opt.id }))}
                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left"
                   style={{
-                    background: data.reviewType === opt.id ? 'hsl(217 91% 60% / 0.15)' : 'hsl(222 47% 12%)',
-                    border: data.reviewType === opt.id ? '1px solid hsl(217 91% 60%)' : '1px solid hsl(222 47% 20%)',
+                    background: data.reviewType === opt.id ? 'hsl(var(--primary) / 0.15)' : 'hsl(var(--muted))',
+                    border: data.reviewType === opt.id ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--border))',
                   }}
                 >
-                  <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: data.reviewType === opt.id ? 'hsl(217 91% 60%)' : 'hsl(215 20% 55%)' }} />
+                  <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: data.reviewType === opt.id ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }} />
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: data.reviewType === opt.id ? 'hsl(217 91% 60%)' : 'hsl(210 40% 98%)' }}>{opt.label}</p>
+                    <p className="text-sm font-semibold" style={{ color: data.reviewType === opt.id ? 'hsl(var(--primary))' : 'hsl(var(--foreground))' }}>{opt.label}</p>
                     <p className="text-xs" style={{ color: mutedColor }}>{opt.sub}</p>
                   </div>
-                  {data.reviewType === opt.id && <CheckCircle2 className="h-4 w-4 ml-auto flex-shrink-0" style={{ color: 'hsl(217 91% 60%)' }} />}
+                  {data.reviewType === opt.id && <CheckCircle2 className="h-4 w-4 ml-auto flex-shrink-0" style={{ color: 'hsl(var(--primary))' }} />}
                 </button>
               ))}
             </div>
@@ -339,10 +337,10 @@ const Onboarding = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={bgStyle}>
+    <div className="min-h-screen flex items-center justify-center p-4 gradient-bg">
       <div
         className="fixed top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, hsl(217 91% 60% / 0.06) 0%, transparent 70%)', filter: 'blur(40px)' }}
+        style={{ background: 'radial-gradient(circle, hsl(var(--primary) / 0.06) 0%, transparent 70%)', filter: 'blur(40px)' }}
       />
       <div className="w-full max-w-sm relative z-10">
         {/* Header */}
@@ -357,7 +355,7 @@ const Onboarding = () => {
         </div>
 
         {/* Progress bar */}
-        <div className="h-1 rounded-full mb-6 overflow-hidden" style={{ background: 'hsl(222 47% 16%)' }}>
+        <div className="h-1 rounded-full mb-6 overflow-hidden" style={{ background: 'hsl(var(--border))' }}>
           <div
             className="h-full rounded-full transition-all duration-500 ease-out"
             style={{ width: `${progress}%`, background: primaryGradient }}
@@ -365,7 +363,7 @@ const Onboarding = () => {
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl p-6" style={{ ...cardStyle, boxShadow: '0 25px 50px -12px hsl(0 0% 0% / 0.5)' }}>
+        <div className="rounded-2xl p-6 bg-card border border-border" style={{ boxShadow: '0 25px 50px -12px hsl(0 0% 0% / 0.5)' }}>
           {renderStep()}
         </div>
 
@@ -376,7 +374,7 @@ const Onboarding = () => {
               type="button"
               onClick={() => setStep(s => s - 1)}
               className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200"
-              style={{ background: 'hsl(222 47% 9%)', border: '1px solid hsl(222 47% 16%)', color: 'hsl(215 20% 60%)' }}
+              style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }}
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
@@ -387,8 +385,8 @@ const Onboarding = () => {
             disabled={!canAdvance() || saving}
             className="flex-1 h-12 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-200"
             style={{
-              background: canAdvance() ? primaryGradient : 'hsl(222 47% 14%)',
-              color: canAdvance() ? 'white' : 'hsl(215 20% 45%)',
+              background: canAdvance() ? primaryGradient : 'hsl(var(--muted))',
+              color: canAdvance() ? 'white' : 'hsl(var(--muted-foreground))',
               boxShadow: canAdvance() ? primaryGlow : 'none',
               border: 'none',
             }}

@@ -12,12 +12,6 @@ import { toast } from 'sonner';
 import type { SessionType, ClassMode } from '@/types/study';
 import { localDateStr } from '@/lib/dateUtils';
 
-const cardBg = 'hsl(222 47% 9%)';
-const border = 'hsl(222 47% 16%)';
-const muted = 'hsl(215 20% 50%)';
-const primaryBlue = 'hsl(217 91% 60%)';
-const primaryGradient = 'linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))';
-
 const RegisterStudy = () => {
   const { subjects, topics, addStudySession } = useStudy();
   const location = useLocation();
@@ -26,17 +20,14 @@ const RegisterStudy = () => {
   const [subjectId, setSubjectId] = useState('');
   const [topicId, setTopicId] = useState('');
 
-  // Pré-preenche quando vem do botão "Iniciar Estudo" do Dashboard
-  // Usa uma ref para evitar sobrescrever após o usuário editar manualmente
   const prefillApplied = React.useRef(false);
   useEffect(() => {
-    if (prefillApplied.current) return; // já aplicou, não sobrescreve
+    if (prefillApplied.current) return;
     const state = location.state as { suggestedTopicId?: string } | null;
     if (state?.suggestedTopicId && topics.length > 0) {
       const topic = topics.find(t => t.id === state.suggestedTopicId);
       if (topic) {
         setSubjectId(topic.subjectId);
-        // Aguarda o React re-renderizar com o subjectId antes de setar o topicId
         setTimeout(() => {
           setTopicId(topic.id);
           prefillApplied.current = true;
@@ -94,10 +85,10 @@ const RegisterStudy = () => {
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
-          <PenLine className="h-7 w-7" style={{ color: primaryBlue }} /> Registrar Sessão
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+          <PenLine className="h-7 w-7 text-primary" /> Registrar Sessão
         </h1>
-        <p className="mt-1 text-sm" style={{ color: muted }}>
+        <p className="mt-1 text-sm text-muted-foreground">
           Registre um estudo autônomo ou uma aula — ambos geram revisões automáticas
         </p>
       </div>
@@ -105,37 +96,40 @@ const RegisterStudy = () => {
       {/* Banner quando vem pré-preenchido do Dashboard */}
       {(location.state as any)?.suggestedTopicId && !saved && (
         <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
-          style={{ background: 'hsl(217 91% 60% / 0.1)', border: '1px solid hsl(217 91% 60% / 0.3)' }}>
+          style={{ background: 'hsl(var(--primary) / 0.1)', border: '1px solid hsl(var(--primary) / 0.3)' }}>
           <span className="text-base">⚡</span>
-          <p style={{ color: 'hsl(217 91% 75%)' }}>
+          <p className="text-primary">
             Formulário pré-preenchido com a sugestão do Dashboard. Ajuste se necessário.
           </p>
         </div>
       )}
 
       {saved ? (
-        <Card className="p-12 text-center" style={{ background: cardBg, border: `1px solid ${border}` }}>
-          <CheckCircle2 className="h-16 w-16 mx-auto mb-4" style={{ color: 'hsl(142 71% 45%)' }} />
-          <h2 className="text-xl font-bold text-white">{sessionType === 'class' ? 'Aula Registrada!' : 'Estudo Registrado!'}</h2>
-          <p className="mt-2 text-sm" style={{ color: muted }}>Revisoes automaticas foram agendadas.</p>
+        <Card className="p-12 text-center">
+          <CheckCircle2 className="h-16 w-16 mx-auto mb-4 text-success" />
+          <h2 className="text-xl font-bold text-foreground">{sessionType === 'class' ? 'Aula Registrada!' : 'Estudo Registrado!'}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Revisoes automaticas foram agendadas.</p>
         </Card>
       ) : (
-        <Card className="p-5 md:p-6" style={{ background: cardBg, border: `1px solid ${border}` }}>
+        <Card className="p-5 md:p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Tipo de Sessão</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tipo de Sessão</Label>
               <div className="grid grid-cols-2 gap-3">
                 {sessionTypes.map(({ value, label, Icon, desc }) => {
                   const active = sessionType === value;
                   return (
                     <button key={value} type="button" onClick={() => setSessionType(value)}
-                      className="flex flex-col items-start p-3.5 rounded-xl transition-all text-left"
-                      style={{ background: active ? 'hsl(217 91% 60% / 0.12)' : 'hsl(222 47% 12%)', border: `2px solid ${active ? primaryBlue : border}` }}>
+                      className="flex flex-col items-start p-3.5 rounded-xl transition-all text-left border-2"
+                      style={{
+                        background: active ? 'hsl(var(--primary) / 0.08)' : 'hsl(var(--muted))',
+                        borderColor: active ? 'hsl(var(--primary))' : 'hsl(var(--border))',
+                      }}>
                       <div className="flex items-center gap-2 mb-1">
-                        <Icon className="h-4 w-4" style={{ color: active ? primaryBlue : muted }} />
-                        <span className="font-semibold text-sm" style={{ color: active ? 'white' : muted }}>{label}</span>
+                        <Icon className="h-4 w-4" style={{ color: active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }} />
+                        <span className="font-semibold text-sm" style={{ color: active ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))' }}>{label}</span>
                       </div>
-                      <p className="text-[11px] leading-snug" style={{ color: muted }}>{desc}</p>
+                      <p className="text-[11px] leading-snug text-muted-foreground">{desc}</p>
                     </button>
                   );
                 })}
@@ -144,14 +138,18 @@ const RegisterStudy = () => {
 
             {sessionType === 'class' && (
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Modalidade da Aula</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Modalidade da Aula</Label>
                 <div className="flex gap-2 flex-wrap">
                   {classModes.map(({ value, label, Icon }) => {
                     const active = classMode === value;
                     return (
                       <button key={value} type="button" onClick={() => setClassMode(value)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                        style={{ background: active ? primaryGradient : 'hsl(222 47% 14%)', border: `1px solid ${active ? 'transparent' : border}`, color: active ? 'white' : muted }}>
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border"
+                        style={{
+                          background: active ? 'var(--gradient-primary)' : 'hsl(var(--muted))',
+                          borderColor: active ? 'transparent' : 'hsl(var(--border))',
+                          color: active ? 'white' : 'hsl(var(--muted-foreground))',
+                        }}>
                         <Icon className="h-3.5 w-3.5" />{label}
                       </button>
                     );
@@ -161,85 +159,78 @@ const RegisterStudy = () => {
             )}
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Disciplina *</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Disciplina *</Label>
               <Select value={subjectId} onValueChange={v => { setSubjectId(v); setTopicId(''); }}>
-                <SelectTrigger style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}`, color: 'white' }}>
+                <SelectTrigger>
                   <SelectValue placeholder="Selecione a disciplina..." />
                 </SelectTrigger>
-                <SelectContent style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}>
-                  {subjects.map(s => <SelectItem key={s.id} value={s.id} style={{ color: 'white' }}>{s.name}</SelectItem>)}
+                <SelectContent>
+                  {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Assunto / Topico *</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assunto / Topico *</Label>
               <Select value={topicId} onValueChange={setTopicId} disabled={!subjectId}>
-                <SelectTrigger style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}`, color: 'white' }}>
+                <SelectTrigger>
                   <SelectValue placeholder={subjectId ? 'Selecione o topico...' : 'Selecione a disciplina primeiro'} />
                 </SelectTrigger>
-                <SelectContent style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }}>
-                  {filteredTopics.map(t => <SelectItem key={t.id} value={t.id} style={{ color: 'white' }}>{t.name}</SelectItem>)}
+                <SelectContent>
+                  {filteredTopics.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Duracao (minutos) *</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Duracao (minutos) *</Label>
               <Input type="number" min="1" max="600"
                 value={minutes} onChange={e => setMinutes(e.target.value)}
-                placeholder={sessionType === 'class' ? 'Ex: 50 (duracao da aula)' : 'Ex: 90'}
-                className="text-white"
-                style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
+                placeholder={sessionType === 'class' ? 'Ex: 50 (duracao da aula)' : 'Ex: 90'} />
             </div>
 
             {sessionType === 'study' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Questoes Feitas</Label>
-                  <Input type="number" min="0" value={questionsTotal} onChange={e => setQuestionsTotal(e.target.value)} placeholder="0"
-                    className="text-white" style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Questoes Feitas</Label>
+                  <Input type="number" min="0" value={questionsTotal} onChange={e => setQuestionsTotal(e.target.value)} placeholder="0" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Questoes Corretas</Label>
-                  <Input type="number" min="0" value={questionsCorrect} onChange={e => setQuestionsCorrect(e.target.value)} placeholder="0"
-                    className="text-white" style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Questoes Corretas</Label>
+                  <Input type="number" min="0" value={questionsCorrect} onChange={e => setQuestionsCorrect(e.target.value)} placeholder="0" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Paginas Lidas</Label>
-                  <Input type="number" min="0" value={pagesRead} onChange={e => setPagesRead(e.target.value)} placeholder="0"
-                    className="text-white" style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Paginas Lidas</Label>
+                  <Input type="number" min="0" value={pagesRead} onChange={e => setPagesRead(e.target.value)} placeholder="0" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>Videos Assistidos</Label>
-                  <Input type="number" min="0" value={videosWatched} onChange={e => setVideosWatched(e.target.value)} placeholder="0"
-                    className="text-white" style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Videos Assistidos</Label>
+                  <Input type="number" min="0" value={videosWatched} onChange={e => setVideosWatched(e.target.value)} placeholder="0" />
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: muted }}>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Anotacoes {sessionType === 'class' ? '(duvidas, pontos importantes)' : '(opcional)'}
               </Label>
               <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
                 placeholder={sessionType === 'class' ? 'Ex: Professor explicou o metodo de integracao por partes...' : 'Ex: Revisar o conceito de...'}
-                className="text-white resize-none"
-                style={{ background: 'hsl(222 47% 12%)', border: `1px solid ${border}` }} />
+                className="resize-none" />
             </div>
 
             <div className="flex items-start gap-2 p-3 rounded-xl text-xs"
-              style={{ background: 'hsl(217 91% 60% / 0.08)', border: '1px solid hsl(217 91% 60% / 0.2)' }}>
+              style={{ background: 'hsl(var(--primary) / 0.08)', border: '1px solid hsl(var(--primary) / 0.2)' }}>
               <span className="text-base">📅</span>
-              <p style={{ color: 'hsl(217 91% 75%)' }}>
+              <p className="text-primary">
                 {sessionType === 'class'
                   ? 'Ao registrar esta aula, revisões serão agendadas automaticamente em 1, 7 e 30 dias.'
                   : 'Ao registrar este estudo, revisões serão agendadas automaticamente em 1, 7 e 30 dias.'}
               </p>
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base font-semibold"
-              style={{ background: primaryGradient, color: 'white', border: 'none' }}>
+            <Button type="submit" className="w-full h-12 text-base font-semibold text-white"
+              style={{ background: 'var(--gradient-primary)', border: 'none' }}>
               {sessionType === 'class' ? 'Registrar Aula' : 'Registrar Estudo'}
             </Button>
           </form>

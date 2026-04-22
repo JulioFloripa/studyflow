@@ -31,9 +31,9 @@ const queryClient = new QueryClient();
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return (
-    <div className="flex items-center justify-center min-h-screen" style={{ background: "hsl(222 47% 6%)" }}>
+    <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(240 80% 65%))" }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'var(--gradient-primary)' }}>
           <BookOpen className="h-5 w-5 text-white" />
         </div>
         <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />

@@ -70,7 +70,7 @@ const SettingsPage = () => {
               <Input type="date" value={form.examDate} onChange={e => setForm(prev => ({ ...prev, examDate: e.target.value }))} />
             </div>
           </div>
-          <div className="rounded-lg p-3 text-sm" style={{ background: 'hsl(217 91% 60% / 0.08)', border: '1px solid hsl(217 91% 60% / 0.2)', color: 'hsl(217 91% 75%)' }}>
+          <div className="rounded-lg p-3 text-sm" style={{ background: 'hsl(var(--primary) / 0.08)', border: '1px solid hsl(var(--primary) / 0.2)', color: 'hsl(var(--primary))' }}>
             💡 <strong>Múltiplas provas?</strong> Gerencie seus editais diretamente na tela <strong>Editais</strong> — você pode importar quantos quiser e remover os que não precisar mais.
           </div>
         </Card>
