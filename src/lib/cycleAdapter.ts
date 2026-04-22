@@ -1,19 +1,20 @@
 /**
  * cycleAdapter.ts
- * Adapta os dados do onboarding do estudante para o formato esperado
- * pelo cycleGeneratorV2, sem necessidade de grade de turma.
+ * Adapta os dados do onboarding para o cycleGeneratorV2.
+ * Lê a agenda semanal (ws_classes_v2) para:
+ *  - criar slots de aula (occupied) nos horários corretos
+ *  - criar slots livres apenas fora dos horários de aula
+ *  - passar as aulas ao gerador para ativar a revisão imediata pós-aula
  */
 
 import { Subject } from '@/types/study';
-import { TimeSlot, Student } from '@/types/educational';
+import { TimeSlot, Student, ScheduleSubject } from '@/types/educational';
 import { generateSmartCycleV2, StudyCycleResult, DifficultyTopic } from './cycleGeneratorV2';
 
-// Mapeamento de dias do onboarding para número (0=dom, 1=seg, ...)
 const DAY_MAP: Record<string, number> = {
   dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6,
 };
 
-// Mapeamento de horas disponíveis por dia (em minutos)
 const HOURS_MAP: Record<string, number> = {
   less1: 45,
   '1to2': 90,
@@ -21,64 +22,124 @@ const HOURS_MAP: Record<string, number> = {
   more4: 270,
 };
 
+const STORAGE_KEY_CLASSES = 'ws_classes_v2';
+
 export interface OnboardingData {
   dailyHours: string;       // 'less1' | '1to2' | '2to4' | 'more4'
-  studyDays: string[];      // ['seg', 'ter', 'qua', 'qui', 'sex']
-  studyStartTime?: string;  // '07:00' — horário preferido para iniciar (padrão: 08:00)
-  examDate?: string;        // data da prova para contagem regressiva
+  studyDays: string[];      // ['seg', 'ter', ...]
+  studyStartTime?: string;  // '08:00'
+  examDate?: string;
+}
+
+interface StoredEntry {
+  id: string;
+  type?: 'class' | 'sleep' | 'exercise';
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  subjectId?: string;
+  repeats: boolean;
+}
+
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+function timeToMin(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function loadStoredClasses(): StoredEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY_CLASSES) || '[]');
+  } catch {
+    return [];
+  }
 }
 
 /**
- * Gera blocos de tempo livres a partir dos dados de disponibilidade do onboarding.
- * Cria slots de 30 minutos para cada dia disponível, respeitando o total de minutos/dia.
+ * Gera TimeSlots a partir do onboarding + agenda semanal.
+ * - Slots de aula (occupied/class) nos horários cadastrados
+ * - Slots livres (free/study) fora dos horários de aula, na quantidade certa por dia
  */
 function buildTimeSlotsFromOnboarding(
   onboarding: OnboardingData,
-  studentId: string
+  studentId: string,
+  classEntries: StoredEntry[]
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
   const minutesPerDay = HOURS_MAP[onboarding.dailyHours] ?? 90;
-  const slotsPerDay = Math.floor(minutesPerDay / 30);
+  const targetFreeSlots = Math.floor(minutesPerDay / 30);
   const startHour = onboarding.studyStartTime
     ? parseInt(onboarding.studyStartTime.split(':')[0])
     : 8;
   const now = new Date().toISOString();
 
+  // Índice de intervalos ocupados por dia
+  const busyByDay: Record<number, Array<{ start: number; end: number; subjectId: string }>> = {};
+  classEntries.forEach(cls => {
+    if (!busyByDay[cls.dayOfWeek]) busyByDay[cls.dayOfWeek] = [];
+    busyByDay[cls.dayOfWeek].push({
+      start: timeToMin(cls.startTime),
+      end: timeToMin(cls.endTime),
+      subjectId: cls.subjectId || '',
+    });
+  });
+
   onboarding.studyDays.forEach(dayStr => {
     const dayOfWeek = DAY_MAP[dayStr];
     if (dayOfWeek === undefined) return;
 
-    for (let i = 0; i < slotsPerDay; i++) {
-      const totalMinutes = startHour * 60 + i * 30;
-      const hours = Math.floor(totalMinutes / 60);
-      const mins = totalMinutes % 60;
-      const startTime = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    const busy = busyByDay[dayOfWeek] || [];
 
-      slots.push({
-        id: `slot-${dayOfWeek}-${i}`,
-        studentId,
-        dayOfWeek,
-        startTime,
-        status: 'free',
-        scheduleType: 'study',
-        createdAt: now,
-        updatedAt: now,
-      });
+    // 1. Slots de aula — o gerador usa para agendar revisão imediata pós-aula
+    busy.forEach((range, ri) => {
+      let cur = range.start;
+      let si = 0;
+      while (cur < range.end) {
+        slots.push({
+          id: `cls-${dayOfWeek}-${ri}-${si}`,
+          studentId,
+          dayOfWeek,
+          startTime: minutesToTime(cur),
+          status: 'occupied',
+          scheduleType: 'class',
+          subjectId: range.subjectId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        cur += 30;
+        si++;
+      }
+    });
+
+    // 2. Slots livres — pula horários de aula, gera a quantidade configurada no onboarding
+    let freeCount = 0;
+    for (let min = startHour * 60; min < 22 * 60 && freeCount < targetFreeSlots; min += 30) {
+      const isBusy = busy.some(r => min >= r.start && min < r.end);
+      if (!isBusy) {
+        slots.push({
+          id: `free-${dayOfWeek}-${freeCount}`,
+          studentId,
+          dayOfWeek,
+          startTime: minutesToTime(min),
+          status: 'free',
+          scheduleType: 'study',
+          createdAt: now,
+          updatedAt: now,
+        });
+        freeCount++;
+      }
     }
   });
 
   return slots;
 }
 
-/**
- * Constrói o objeto Student mínimo necessário para o cycleGeneratorV2.
- * Usa "as unknown as Student" para evitar preencher campos opcionais desnecessários.
- */
-function buildStudentFromProfile(
-  userId: string,
-  name: string,
-  onboarding: OnboardingData
-): Student {
+function buildStudentFromProfile(userId: string, name: string): Student {
   const now = new Date().toISOString();
   return {
     id: userId,
@@ -92,7 +153,8 @@ function buildStudentFromProfile(
 }
 
 /**
- * Função principal: gera o ciclo semanal completo a partir dos dados do estudante.
+ * Gera o ciclo semanal completo a partir dos dados do estudante.
+ * Integra automaticamente com a Agenda Semanal (ws_classes_v2).
  */
 export function generateStudentCycle(
   userId: string,
@@ -102,31 +164,38 @@ export function generateStudentCycle(
   topicsBySubject: Record<string, string[]>,
   difficultyTopics: DifficultyTopic[] = []
 ): StudyCycleResult {
-  const timeSlots = buildTimeSlotsFromOnboarding(onboarding, userId);
-  const student = buildStudentFromProfile(userId, name, onboarding);
+  // Carrega apenas entradas do tipo 'class' (ignora sono e exercício)
+  const allEntries = loadStoredClasses();
+  const classEntries = allEntries.filter(e => !e.type || e.type === 'class');
 
-  // Converter subjects do StudyContext para o formato do cycleGeneratorV2
-  const cycleSubjects = subjects.map(s => ({
+  const timeSlots = buildTimeSlotsFromOnboarding(onboarding, userId, classEntries);
+  const student = buildStudentFromProfile(userId, name);
+
+  // Passa disciplinas como ScheduleSubjects para o gerador conseguir resolver nomes nas aulas
+  const scheduleSubjects: ScheduleSubject[] = subjects.map(s => ({
     id: s.id,
+    coordinatorId: '',
     name: s.name,
-    priority: s.priority,
-    color: s.color,
+    color: s.color || '#6366f1',
+    createdAt: new Date().toISOString(),
   }));
+
+  const cycleSubjects = subjects.map(s => ({ ...s, priority: s.priority ?? 3 }));
 
   return generateSmartCycleV2(
     student,
     timeSlots,
     cycleSubjects as Subject[],
     topicsBySubject,
-    [], // sem grade de aulas (scheduleSubjects)
-    {}, // sem tópicos da semana do coordenador
+    scheduleSubjects,
+    {},
     difficultyTopics
   );
 }
 
 /**
- * Extrai tópicos de dificuldade a partir das sessões de estudo do estudante.
- * Considera dificuldade quando taxa de acerto < 70% com pelo menos 5 questões.
+ * Extrai tópicos de dificuldade a partir das sessões de estudo.
+ * Considera dificuldade quando acerto < 70% com pelo menos 5 questões.
  */
 export function extractDifficultyTopics(
   studySessions: Array<{
@@ -150,8 +219,7 @@ export function extractDifficultyTopics(
     const key = session.topicId;
     if (!topicStats[key]) {
       topicStats[key] = {
-        correct: 0,
-        total: 0,
+        correct: 0, total: 0,
         subjectId: session.subjectId,
         subjectName: subjectMap.get(session.subjectId) ?? session.subjectName ?? '',
         topicName: session.topicName ?? '',
