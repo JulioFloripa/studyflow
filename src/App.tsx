@@ -14,7 +14,7 @@ import RegisterStudy from "@/pages/RegisterStudy";
 import Reviews from "@/pages/Reviews";
 import VerticalSyllabus from "@/pages/VerticalSyllabus";
 import Difficulties from "@/pages/Difficulties";
-import Agenda from "@/pages/Agenda";
+import Agenda from "@/pages/WeeklySchedule";
 import Gamification from "@/pages/Gamification";
 import Classes from "@/pages/Classes";
 import Students from "@/pages/Students";
