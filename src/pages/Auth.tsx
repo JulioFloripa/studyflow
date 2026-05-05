@@ -77,7 +77,7 @@ const Auth = () => {
             toast.success('Conta criada! Verifique seu e-mail para confirmar o cadastro.');
           } else {
             toast.success('Conta criada! Verifique seu e-mail e depois escolha seu plano.');
-            navigate('/planos');
+            navigate('/');
           }
         }
       }

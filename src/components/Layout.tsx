@@ -1,7 +1,7 @@
 import { Outlet, useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, Calendar, PenLine, RotateCcw,
-  ListChecks, AlertTriangle, Trophy, Menu, FileText, LogOut,
+  AlertTriangle, Trophy, Menu, FileText, LogOut,
   Timer, Settings2, CalendarDays, Sun, Moon,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -20,7 +20,6 @@ const navItems = [
   { path: '/registrar', label: 'Registrar', icon: PenLine },
   { path: '/revisoes', label: 'Revisões', icon: RotateCcw },
   { path: '/edital', label: 'Editais', icon: FileText },
-  { path: '/conteudo', label: 'Conteúdo', icon: ListChecks },
   { path: '/dificuldades', label: 'Dificuldades', icon: AlertTriangle },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
   { path: '/meu-plano', label: 'Meu Plano', icon: Settings2 },

@@ -20,6 +20,9 @@ import Classes from "@/pages/Classes";
 import Students from "@/pages/Students";
 import StudentCycle from "@/pages/StudentCycle";
 import StudentDashboard from "@/pages/StudentDashboard";
+import Timer from "@/pages/Timer";
+import MyPlan from "@/pages/MyPlan";
+import ResetPassword from "@/pages/ResetPassword";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -43,6 +46,7 @@ const App = () => (
             <EducationalProvider>
             <Routes>
               <Route path="/login" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 <Route path="/" element={<DashboardRouter />} />
 
@@ -63,6 +67,8 @@ const App = () => (
 
                 {/* Shared routes */}
                 <Route path="/registrar" element={<RegisterStudy />} />
+                <Route path="/cronometro" element={<RoleRoute allowedRoles={['student']}><Timer /></RoleRoute>} />
+                <Route path="/meu-plano" element={<RoleRoute allowedRoles={['student']}><MyPlan /></RoleRoute>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
