@@ -14,6 +14,7 @@ export interface OnboardingData {
   studyDays: string[];
   studyStartTime?: string;
   examDate?: string;
+  dailyMinutesPerDay?: Record<number, number>; // dayOfWeek (0-6) -> minutes
 }
 
 export interface StoredEntry {
@@ -42,8 +43,7 @@ function buildTimeSlotsFromOnboarding(
   classEntries: StoredEntry[]
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  const minutesPerDay = HOURS_MAP[onboarding.dailyHours] ?? 90;
-  const targetFreeSlots = Math.floor(minutesPerDay / 30);
+  const uniformMinutes = HOURS_MAP[onboarding.dailyHours] ?? 90;
   const startHour = onboarding.studyStartTime
     ? parseInt(onboarding.studyStartTime.split(':')[0])
     : 8;
@@ -62,6 +62,12 @@ function buildTimeSlotsFromOnboarding(
   onboarding.studyDays.forEach(dayStr => {
     const dayOfWeek = DAY_MAP[dayStr];
     if (dayOfWeek === undefined) return;
+
+    // Use per-day minutes when available (from userProfile.availability), else uniform fallback
+    const minutesForDay = onboarding.dailyMinutesPerDay?.[dayOfWeek] ?? uniformMinutes;
+    if (minutesForDay <= 0) return;
+    const targetFreeSlots = Math.floor(minutesForDay / 30);
+
     const busy = busyByDay[dayOfWeek] || [];
 
     busy.forEach((range, ri) => {

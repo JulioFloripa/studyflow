@@ -11,17 +11,24 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, Printer, RefreshCw,
   BookOpen, Clock, BarChart2, Zap, CheckCircle, AlertTriangle,
-  Star, RotateCcw, Target, TrendingUp,
+  Star, RotateCcw, Target, TrendingUp, Lightbulb, Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useStudy } from '@/contexts/StudyContext';
 import { generateStudentCycle, extractDifficultyTopics } from '@/lib/cycleAdapter';
 import { formatCycleForWeek, CycleSlot } from '@/lib/cycleGeneratorV2';
 import { useAuth } from '@/hooks/useAuth';
+import { Link } from 'react-router-dom';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const DAY_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+// Mapeamento de chaves do MyPlan (seg, ter...) para índice dayOfWeek
+const AVAIL_KEY_TO_DOW: Record<string, number> = {
+  dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6,
+};
+const DOW_TO_AVAIL_KEY = ['dom','seg','ter','qua','qui','sex','sab'];
 
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -159,16 +166,47 @@ const Planning: React.FC = () => {
     return map;
   }, [scheduleEntries]);
 
-  // Dados do onboarding
+  // ── Disponibilidade do aluno (fonte: MyPlan → userProfile.availability) ──────
+  const availabilityByDow = useMemo(() => {
+    const avail = userProfile.availability || {};
+    const map: Record<number, number> = {}; // dow -> hours
+    Object.entries(AVAIL_KEY_TO_DOW).forEach(([key, dow]) => {
+      const h = avail[key] ?? 0;
+      if (h > 0) map[dow] = h;
+    });
+    return map;
+  }, [userProfile.availability]);
+
+  const totalAvailableHours = useMemo(
+    () => Object.values(availabilityByDow).reduce((a, b) => a + b, 0),
+    [availabilityByDow]
+  );
+
+  const hasAvailability = totalAvailableHours > 0;
+
+  // ── Onboarding derivado da disponibilidade real do aluno ──────────────────
   const onboarding = useMemo(() => {
+    const savedStart = userProfile.studyStartTime || '08:00';
+
+    if (hasAvailability) {
+      const studyDays = Object.keys(AVAIL_KEY_TO_DOW).filter(
+        key => (userProfile.availability?.[key] ?? 0) > 0
+      );
+      const dailyMinutesPerDay: Record<number, number> = {};
+      studyDays.forEach(key => {
+        dailyMinutesPerDay[AVAIL_KEY_TO_DOW[key]] = Math.round((userProfile.availability?.[key] ?? 0) * 60);
+      });
+      return { dailyHours: '1to2', studyDays, studyStartTime: savedStart, dailyMinutesPerDay };
+    }
+
+    // Fallback para dados do onboarding antigo
     const od = userProfile?.onboarding_data as Record<string, unknown> | undefined;
-    const savedStart = (od?.studyStartTime as string) || userProfile.studyStartTime || '08:00';
     return {
       dailyHours: (od?.dailyHours as string) || '1to2',
       studyDays: (od?.studyDays as string[]) || ['seg', 'ter', 'qua', 'qui', 'sex'],
-      studyStartTime: savedStart,
+      studyStartTime: (od?.studyStartTime as string) || savedStart,
     };
-  }, [userProfile]);
+  }, [userProfile, hasAvailability]);
 
   const topicsBySubject = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -371,6 +409,115 @@ const Planning: React.FC = () => {
           </div>
         )}
 
+        {/* ── Painel de disponibilidade ─────────────────────────────────────────── */}
+        <div
+          className="rounded-xl border p-4 mb-6 no-print"
+          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+        >
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Clock size={14} style={{ color: 'hsl(var(--primary))' }} />
+              Disponibilidade configurada
+              {!hasAvailability && (
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'hsl(35 90% 55% / 0.15)', color: 'hsl(35 90% 65%)' }}>
+                  usando padrão
+                </span>
+              )}
+            </h3>
+            <Link
+              to="/meu-plano"
+              className="flex items-center gap-1 text-xs font-medium transition-colors hover:opacity-80"
+              style={{ color: 'hsl(var(--primary))' }}
+            >
+              <Settings size={12} /> Ajustar disponibilidade
+            </Link>
+          </div>
+
+          {/* Grade de dias */}
+          <div className="grid grid-cols-7 gap-1.5 mb-4">
+            {[1,2,3,4,5,6,0].map(dow => {
+              const hours = availabilityByDow[dow] ?? 0;
+              const allocated = stats ? (Object.values(byDay[dow] ?? []).reduce((s, sl) => s + sl.duration, 0)) / 60 : 0;
+              const utilPct = hours > 0 ? Math.min(100, Math.round((allocated / hours) * 100)) : 0;
+              const isToday = isCurrentWeek && dow === todayDow;
+              return (
+                <div key={dow} className="text-center">
+                  <p className="text-[10px] font-semibold mb-1 uppercase tracking-wider" style={{ color: isToday ? 'hsl(var(--primary))' : 'var(--text-secondary)' }}>
+                    {DAY_SHORT[dow]}
+                  </p>
+                  <div
+                    className="rounded-lg py-2 text-sm font-bold"
+                    style={{
+                      background: hours > 0 ? 'hsl(var(--primary) / 0.12)' : 'hsl(var(--muted))',
+                      color: hours > 0 ? 'hsl(var(--primary))' : 'var(--text-secondary)',
+                      border: isToday ? '1px solid hsl(var(--primary) / 0.5)' : '1px solid transparent',
+                    }}
+                  >
+                    {hours > 0 ? `${hours}h` : '—'}
+                  </div>
+                  {hours > 0 && isCurrentWeek && (
+                    <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border-color)' }}>
+                      <div className="h-1 rounded-full" style={{ width: `${utilPct}%`, background: utilPct >= 90 ? '#10b981' : 'hsl(var(--primary))' }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Análise e sugestões */}
+          {(() => {
+            const goalHours = userProfile.weeklyGoalHours || 20;
+            const gap = goalHours - totalAvailableHours;
+            const daysUntilExam = userProfile.examDate
+              ? Math.max(0, Math.ceil((new Date(userProfile.examDate).getTime() - Date.now()) / 86400000))
+              : null;
+
+            const suggestions: { color: string; icon: React.ReactNode; text: string }[] = [];
+
+            if (!hasAvailability) {
+              suggestions.push({
+                color: 'hsl(35 90% 55%)',
+                icon: <AlertTriangle size={13} />,
+                text: 'Sua disponibilidade ainda não foi configurada. O plano usa valores padrão. Acesse "Meu Plano" para definir as horas reais de cada dia.',
+              });
+            } else if (gap > 2) {
+              suggestions.push({
+                color: 'hsl(35 90% 55%)',
+                icon: <Lightbulb size={13} />,
+                text: `Você tem ${totalAvailableHours}h disponíveis, mas sua meta é ${goalHours}h/semana. Libere mais ${gap.toFixed(0)}h na semana para atingir seu objetivo.`,
+              });
+            } else if (totalAvailableHours >= goalHours) {
+              suggestions.push({
+                color: '#10b981',
+                icon: <CheckCircle size={13} />,
+                text: `Disponibilidade de ${totalAvailableHours}h cobre sua meta de ${goalHours}h/semana. `,
+              });
+            }
+
+            if (daysUntilExam !== null && daysUntilExam <= 60 && totalAvailableHours < 15) {
+              suggestions.push({
+                color: '#ef4444',
+                icon: <AlertTriangle size={13} />,
+                text: `Prova em ${daysUntilExam} dias e apenas ${totalAvailableHours}h/semana disponíveis. Considere aumentar a carga diária para não perder conteúdo.`,
+              });
+            }
+
+            if (suggestions.length === 0) return null;
+            return (
+              <div className="space-y-2">
+                {suggestions.map((s, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs rounded-lg px-3 py-2"
+                    style={{ background: s.color + '12', border: `1px solid ${s.color}30`, color: s.color }}>
+                    <span className="flex-shrink-0 mt-0.5">{s.icon}</span>
+                    <span>{s.text}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
         {/* ── Recomendações ─────────────────────────────────────────────────────── */}
         {cycleResult && cycleResult.recommendations.length > 0 && (
           <div
@@ -438,6 +585,11 @@ const Planning: React.FC = () => {
                       {classTotalMin > 0 && (
                         <div className="text-xs" style={{ color: 'hsl(var(--primary))' }}>
                           {fmtHours(classTotalMin)} aula
+                        </div>
+                      )}
+                      {availabilityByDow[dow] != null && (
+                        <div className="text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+                          {availabilityByDow[dow]}h disponível
                         </div>
                       )}
                     </div>
