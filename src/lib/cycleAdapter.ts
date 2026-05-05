@@ -87,7 +87,8 @@ function buildTimeSlotsFromOnboarding(
 
     let freeCount = 0;
     for (let min = startHour * 60; min < 22 * 60 && freeCount < targetFreeSlots; min += 30) {
-      const isBusy = busy.some(r => min >= r.start && min < r.end);
+      // Intervalo overlap: o slot [min, min+30) sobrepõe [r.start, r.end)?
+      const isBusy = busy.some(r => min < r.end && (min + 30) > r.start);
       if (!isBusy) {
         slots.push({
           id: `free-${dayOfWeek}-${freeCount}`,
