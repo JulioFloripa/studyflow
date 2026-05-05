@@ -1,6 +1,4 @@
 export type TopicStatus = 'not_started' | 'in_progress' | 'completed';
-export type SessionType = 'study' | 'class';
-export type ClassMode = 'presencial' | 'online' | 'gravada';
 
 export interface Subject {
   id: string;
@@ -28,8 +26,6 @@ export interface StudySession {
   pagesRead: number;
   videosWatched: number;
   notes: string;
-  sessionType: SessionType;
-  classMode?: ClassMode;
 }
 
 export interface Review {
@@ -43,7 +39,7 @@ export interface Review {
   minutesSpent?: number;
   questionsTotal?: number;
   questionsCorrect?: number;
-  type: 'D1' | 'D7' | 'D30';
+  type: 'D1' | 'D7' | 'D30' | 'adaptive';
   easeFactor?: number; // 1-5: quão fácil foi a revisão
   nextInterval?: number; // dias até próxima revisão (calculado)
 }
@@ -55,17 +51,6 @@ export interface StudyCycleItem {
   order: number;
 }
 
-export interface ScheduleEntry {
-  id: string;
-  type: 'class' | 'sleep' | 'exercise';
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  subjectId: string;
-  label: string;
-  repeats: boolean;
-}
-
 export interface UserProfile {
   name: string;
   objective: string;
@@ -73,13 +58,7 @@ export interface UserProfile {
   examDate: string;
   availability: Record<string, number>;
   reviewIntervals: number[];
-  unlockedBadges?: string[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onboarding_data?: Record<string, any>;
-  studyStartTime?: string;
-  activeEditalId?: string;
-  wellnessDismissedAt?: number;
-  theme?: string;
+  unlockedBadges?: string[]; // IDs dos badges desbloqueados
 }
 
 export interface PresetExam {

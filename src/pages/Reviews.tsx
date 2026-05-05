@@ -50,7 +50,11 @@ const Reviews = () => {
           <p className={`text-sm font-medium ${review.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{topic?.name || 'Assunto removido'}</p>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-muted-foreground">{subject?.name}</span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{review.type}</Badge>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {review.type === 'adaptive'
+                ? `SM-2 · ${review.nextInterval ?? '?'}d`
+                : review.type}
+            </Badge>
             {showDate && <span className="text-xs text-muted-foreground">{review.scheduledDate}</span>}
           </div>
         </div>

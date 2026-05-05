@@ -65,7 +65,7 @@ export function calculateNextReview(
 /**
  * Determina o tipo de revisão baseado no intervalo
  */
-export function getReviewType(interval: number): 'D1' | 'D7' | 'D30' {
+export function getReviewType(interval: number): 'D1' | 'D7' | 'D30' | 'adaptive' {
   if (interval <= 1) return 'D1';
   if (interval <= 14) return 'D7';
   return 'D30';
