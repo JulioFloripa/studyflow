@@ -28,9 +28,56 @@ function fmtDate(d: Date): string {
 function fmtDateLong(d: Date): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
-function timeToMin(t: string): number {
-  const [h, m] = t.split(':').map(Number); return h * 60 + m;
+// Algoritmo de layout de colunas (estilo Google Calendar):
+// agrupa eventos sobrepostos e os distribui em colunas lado a lado.
+function computeLayout(entries: { id: string; startTime: string; endTime: string }[]): Map<string, { col: number; numCols: number }> {
+  if (entries.length === 0) return new Map();
+
+  const sorted = [...entries].sort((a, b) =>
+    timeToMin(a.startTime) - timeToMin(b.startTime)
+  );
+
+  // colEnd[i] = quando a última entrada da coluna i termina
+  const colEnd: number[] = [];
+  const entryCol = new Map<string, number>();
+
+  for (const e of sorted) {
+    const start = timeToMin(e.startTime);
+    const end   = timeToMin(e.endTime);
+    let placed  = false;
+    for (let i = 0; i < colEnd.length; i++) {
+      if (colEnd[i] <= start) {
+        colEnd[i] = end;
+        entryCol.set(e.id, i);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      entryCol.set(e.id, colEnd.length);
+      colEnd.push(end);
+    }
+  }
+
+  // Para cada evento, numCols = colunas simultâneas ativas no seu intervalo
+  const result = new Map<string, { col: number; numCols: number }>();
+  for (const e of sorted) {
+    const start = timeToMin(e.startTime);
+    const end   = timeToMin(e.endTime);
+    let active = 1;
+    for (const other of sorted) {
+      if (other.id === e.id) continue;
+      if (timeToMin(other.startTime) < end && timeToMin(other.endTime) > start) {
+        active = Math.max(active, colEnd.length);
+        break;
+      }
+    }
+    result.set(e.id, { col: entryCol.get(e.id) ?? 0, numCols: active });
+  }
+  return result;
 }
+
+
 function fmtHours(min: number): string {
   const h = Math.floor(min / 60); const m = min % 60;
   if (m === 0) return `${h}h`;
@@ -282,40 +329,55 @@ const WeeklySchedule: React.FC = () => {
                       </div>
                     </div>
                   )}
-                  {dayEntries.map(entry => {
-                    const color = getEntryColor(entry);
-                    const label = getEntryLabel(entry);
-                    const top = topPx(entry.startTime);
-                    const height = heightPx(entry.startTime, entry.endTime);
-                    const durationMin = calcDuration(entry.startTime, entry.endTime, entry.type === 'sleep');
-                    return (
-                      <div key={entry.id} className="absolute rounded-lg cursor-pointer group z-10 overflow-hidden shadow-sm transition-all hover:shadow-md hover:scale-[1.01]"
-                        style={{ top: `${top + 1}px`, height: `${height - 2}px`, left: '3px', right: '3px', backgroundColor: color + '22', borderLeft: `3px solid ${color}`, borderTop: `1px solid ${color}40`, borderRight: `1px solid ${color}40`, borderBottom: `1px solid ${color}40` }}
-                        onClick={e => { e.stopPropagation(); openEdit(entry); }}
-                        title={`${label} · ${entry.startTime}–${entry.endTime}`}>
-                        <div className="p-1.5 h-full flex flex-col justify-between">
-                          <div>
-                            <div className="text-[11px] font-semibold leading-tight truncate flex items-center gap-1" style={{ color }}>
-                              {entry.type === 'sleep' && <Moon size={9} />}
-                              {entry.type === 'exercise' && <Activity size={9} />}
-                              {label}
+                  {(() => {
+                    const layout = computeLayout(dayEntries);
+                    return dayEntries.map(entry => {
+                      const color = getEntryColor(entry);
+                      const label = getEntryLabel(entry);
+                      const top = topPx(entry.startTime);
+                      const height = heightPx(entry.startTime, entry.endTime);
+                      const durationMin = calcDuration(entry.startTime, entry.endTime, entry.type === 'sleep');
+                      const { col, numCols } = layout.get(entry.id) ?? { col: 0, numCols: 1 };
+                      const colW = 100 / numCols;
+                      const leftPct = col * colW;
+                      return (
+                        <div key={entry.id} className="absolute rounded-lg cursor-pointer group z-10 overflow-hidden shadow-sm transition-all hover:shadow-md hover:scale-[1.01]"
+                          style={{
+                            top: `${top + 1}px`, height: `${height - 2}px`,
+                            left: `calc(${leftPct}% + 2px)`,
+                            width: `calc(${colW}% - 4px)`,
+                            backgroundColor: color + '22',
+                            borderLeft: `3px solid ${color}`,
+                            borderTop: `1px solid ${color}40`,
+                            borderRight: `1px solid ${color}40`,
+                            borderBottom: `1px solid ${color}40`,
+                          }}
+                          onClick={e => { e.stopPropagation(); openEdit(entry); }}
+                          title={`${label} · ${entry.startTime}–${entry.endTime}`}>
+                          <div className="p-1.5 h-full flex flex-col justify-between">
+                            <div>
+                              <div className="text-[11px] font-semibold leading-tight truncate flex items-center gap-1" style={{ color }}>
+                                {entry.type === 'sleep' && <Moon size={9} />}
+                                {entry.type === 'exercise' && <Activity size={9} />}
+                                {label}
+                              </div>
+                              {height > 38 && <div className="text-[10px] leading-tight mt-0.5" style={{ color: color + 'bb' }}>{entry.startTime}–{entry.endTime}</div>}
                             </div>
-                            {height > 38 && <div className="text-[10px] leading-tight mt-0.5" style={{ color: color + 'bb' }}>{entry.startTime}–{entry.endTime}</div>}
+                            {height > 52 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px]" style={{ color: color + '99' }}>{durationMin}min</span>
+                                {entry.repeats && <Repeat size={9} style={{ color: color + '88' }} />}
+                              </div>
+                            )}
                           </div>
-                          {height > 52 && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px]" style={{ color: color + '99' }}>{durationMin}min</span>
-                              {entry.repeats && <Repeat size={9} style={{ color: color + '88' }} />}
-                            </div>
-                          )}
+                          <button className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 bg-black/20 hover:bg-black/40"
+                            onClick={e => { e.stopPropagation(); deleteEntry(entry.id); }} title="Remover">
+                            <X size={10} className="text-white" />
+                          </button>
                         </div>
-                        <button className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 bg-black/20 hover:bg-black/40"
-                          onClick={e => { e.stopPropagation(); deleteEntry(entry.id); }} title="Remover">
-                          <X size={10} className="text-white" />
-                        </button>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               );
             })}
