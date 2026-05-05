@@ -28,6 +28,9 @@ function fmtDate(d: Date): string {
 function fmtDateLong(d: Date): string {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
+function timeToMin(t: string): number {
+  const [h, m] = t.split(':').map(Number); return h * 60 + m;
+}
 // Algoritmo de layout de colunas (estilo Google Calendar):
 // agrupa eventos sobrepostos e os distribui em colunas lado a lado.
 function computeLayout(entries: { id: string; startTime: string; endTime: string }[]): Map<string, { col: number; numCols: number }> {
